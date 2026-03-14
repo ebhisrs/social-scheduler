@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Account {
+  id           String    @id @default(cuid())
+  platform     String
+  username     String
+  accessToken  String
+  refreshToken String?
+  tokenExpiry  DateTime?
+  pageId       String?
+  extraData    String?
+  createdAt    DateTime  @default(now())
+  posts        Post[]
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  content     String
+  mediaUrls   String?
+  platforms   String
+  scheduledAt DateTime
+  status      String    @default("pending")
+  articleId   String?
+  humanize    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  sentAt      DateTime?
+  error       String?
+  accounts    Account[]
+}
+
+model Article {
+  id          String     @id @default(cuid())
+  title       String
+  content     String
+  topic       String
+  language    String     @default("fr")
+  seoKeywords String?
+  createdAt   DateTime   @default(now())
+  published   Boolean    @default(false)
+  autoPosts   AutoPost[]
+}
+
+model Schedule {
+  id             String     @id @default(cuid())
+  name           String
+  keyword        String     @default("")
+  dayTimes       String     @default("{}")
+  platforms      String
+  postsPerSlot   Int        @default(1)
+  active         Boolean    @default(true)
+  notifyEmail    String?
+  lastRunAt      DateTime?
+  createdAt      DateTime   @default(now())
+  companyName    String?
+  companyPhone   String?
+  companyAddress String?
+  companyWebsite String?
+  autoPosts      AutoPost[]
+}
+
+model AutoPost {
+  id         String   @id @default(cuid())
+  scheduleId String
+  articleId  String
+  sentAt     DateTime @default(now())
+  accounts   String
+  success    Boolean  @default(true)
+  error      String?
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
