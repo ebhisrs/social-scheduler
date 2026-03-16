@@ -24,14 +24,10 @@ function unwrapProxyUrl(url: string): string {
 
 async function fetchImageBuffer(rawUrl: string): Promise<Buffer> {
   const url = unwrapProxyUrl(rawUrl)
-
-  // Local file from public/uploads/ — read directly from disk
   if (url.startsWith('/uploads/')) {
     const filePath = path.join(process.cwd(), 'public', url)
     return await readFile(filePath)
   }
-
-  // Remote URL
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
@@ -54,7 +50,7 @@ async function uploadPhotoToFacebook(imageUrl: string, accessToken: string, page
     if (!data?.id) throw new Error(`Photo upload failed: ${JSON.stringify(data)}`)
     return data.id
   } catch (err: any) {
-    console.warn('[Facebook] Photo upload failed, will post text only:', err.message)
+    console.warn('[Facebook] Photo upload failed, text only:', err.message)
     return null
   }
 }
@@ -86,8 +82,7 @@ async function postToFacebook(options: PostOptions): Promise<string> {
   const data = await res.json()
   console.log('[Facebook post result]', JSON.stringify(data))
   if (data.error) throw new Error(`Facebook error: ${data.error.message}`)
-  const postId = data.id
-  return `https://www.facebook.com/${postId}`
+  return `https://www.facebook.com/${data.id}`
 }
 
 async function postToTwitter(options: PostOptions): Promise<string> {
@@ -103,6 +98,53 @@ async function postToTwitter(options: PostOptions): Promise<string> {
   return `https://twitter.com/i/web/status/${tweet.data.id}`
 }
 
+// Google Business Profile — max 1500 chars for text
+// We keep full article text + hashtags, just truncate if over 1500
+async function postToGoogleBusiness(options: PostOptions): Promise<string> {
+  const { text, mediaUrls = [], accessToken, pageId } = options
+  if (!pageId) throw new Error('Google Business location name is required (e.g. accounts/123/locations/456)')
+
+  // Google Business max 1500 chars
+  const MAX_GB = 1500
+  const postText = text.length > MAX_GB ? text.substring(0, MAX_GB - 3) + '...' : text
+
+  const body: any = {
+    languageCode: 'fr',
+    summary: postText,
+    topicType: 'STANDARD',
+  }
+
+  // Add photo if available
+  if (mediaUrls.length > 0) {
+    try {
+      const imgBuffer = await fetchImageBuffer(mediaUrls[0])
+      const base64 = imgBuffer.toString('base64')
+      body.media = [{
+        mediaFormat: 'PHOTO',
+        sourceUrl: `data:image/jpeg;base64,${base64}`,
+      }]
+    } catch (err: any) {
+      console.warn('[GoogleBusiness] Photo failed, text only:', err.message)
+    }
+  }
+
+  const res = await fetch(
+    `https://mybusiness.googleapis.com/v4/${pageId}/localPosts`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  )
+  const data = await res.json()
+  console.log('[GoogleBusiness post result]', JSON.stringify(data))
+  if (data.error) throw new Error(`Google Business error: ${data.error.message}`)
+  return data.name || 'posted'
+}
+
 export async function sendPost(options: PostOptions): Promise<string> {
   if (options.humanize) {
     await randomDelay(1000, 3000)
@@ -113,6 +155,8 @@ export async function sendPost(options: PostOptions): Promise<string> {
       return postToFacebook(options)
     case 'twitter':
       return postToTwitter(options)
+    case 'google_business':
+      return postToGoogleBusiness(options)
     default:
       throw new Error(`Platform ${options.platform} not supported`)
   }
