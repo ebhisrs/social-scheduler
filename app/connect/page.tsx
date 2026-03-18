@@ -29,10 +29,10 @@ export default function ConnectPage() {
     if (!form.username) return toast.error('Enter a name')
     if (form.platform !== 'google_business' && !form.accessToken) return toast.error('Enter access token')
     if (form.platform === 'google_business' && !form.makeWebhookUrl) return toast.error('Enter Make.com webhook URL')
+    if (form.platform === 'google_business' && !form.pageId) return toast.error('Enter Location Name')
 
     setSaving(true)
     try {
-      // For Google Business, store webhook URL in extraData
       const extraData = form.platform === 'google_business'
         ? JSON.stringify({ makeWebhookUrl: form.makeWebhookUrl })
         : form.extraData || undefined
@@ -72,21 +72,23 @@ export default function ConnectPage() {
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Add Account</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+          {/* Platform selector */}
           <div>
             <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Platform</label>
-            <select value={form.platform} onChange={e => setForm(f => ({ ...f, platform: e.target.value }))}>
+            <select value={form.platform} onChange={e => setForm(f => ({ ...f, platform: e.target.value, username: '', accessToken: '', pageId: '', makeWebhookUrl: '', extraData: '' }))}>
               <option value="facebook">📘 Facebook Page</option>
               <option value="twitter">𝕏 Twitter / X</option>
               <option value="google_business">🏢 Google Business Profile</option>
             </select>
           </div>
 
+          {/* Name field — all platforms */}
           <div>
             <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>
               {form.platform === 'google_business' ? 'Business name' : 'Username / Page name'} *
             </label>
             <input
-              placeholder={form.platform === 'google_business' ? 'Ex: Mon Commerce Lyon' : 'Ex: Chasseland Artisans'}
+              placeholder={form.platform === 'google_business' ? 'Ex: Labaume Pere et Fils' : 'Ex: Chasseland Artisans'}
               value={form.username}
               onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
             />
@@ -96,11 +98,20 @@ export default function ConnectPage() {
           {form.platform === 'facebook' && <>
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Access Token *</label>
-              <input placeholder="Page access token" value={form.accessToken} onChange={e => setForm(f => ({ ...f, accessToken: e.target.value }))} type="password" />
+              <input
+                placeholder="Page access token"
+                value={form.accessToken}
+                onChange={e => setForm(f => ({ ...f, accessToken: e.target.value }))}
+                type="password"
+              />
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Page ID *</label>
-              <input placeholder="Facebook Page ID" value={form.pageId} onChange={e => setForm(f => ({ ...f, pageId: e.target.value }))} />
+              <input
+                placeholder="Facebook Page ID (numbers only)"
+                value={form.pageId}
+                onChange={e => setForm(f => ({ ...f, pageId: e.target.value }))}
+              />
             </div>
             <div style={{ padding: 12, background: 'rgba(24,119,242,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
               💡 Get token from <a href="https://developers.facebook.com/tools/explorer" target="_blank" style={{ color: '#1877f2' }}>Graph API Explorer</a><br />
@@ -112,11 +123,20 @@ export default function ConnectPage() {
           {form.platform === 'twitter' && <>
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Access Token *</label>
-              <input placeholder="OAuth 1.0a access token" value={form.accessToken} onChange={e => setForm(f => ({ ...f, accessToken: e.target.value }))} type="password" />
+              <input
+                placeholder="OAuth 1.0a access token"
+                value={form.accessToken}
+                onChange={e => setForm(f => ({ ...f, accessToken: e.target.value }))}
+                type="password"
+              />
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Extra Keys (JSON)</label>
-              <input placeholder='{"appKey":"...","appSecret":"...","accessSecret":"..."}' value={form.extraData} onChange={e => setForm(f => ({ ...f, extraData: e.target.value }))} />
+              <input
+                placeholder='{"appKey":"...","appSecret":"...","accessSecret":"..."}'
+                value={form.extraData}
+                onChange={e => setForm(f => ({ ...f, extraData: e.target.value }))}
+              />
             </div>
           </>}
 
@@ -131,24 +151,26 @@ export default function ConnectPage() {
               />
             </div>
             <div>
-  <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Location Name</label>
-  <input
-    placeholder="accounts/17540640580516601221/locations/8346233813110252496"
-    value={form.pageId}
-    onChange={e => setForm(f => ({ ...f, pageId: e.target.value }))}
-  />
-</div>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Location Name *</label>
+              <input
+                placeholder="accounts/17540640580516601221/locations/8346233813110252496"
+                value={form.pageId}
+                onChange={e => setForm(f => ({ ...f, pageId: e.target.value }))}
+              />
+              <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                Format: accounts/YOUR_ACCOUNT_ID/locations/YOUR_LOCATION_ID
+              </p>
+            </div>
             <div style={{ padding: 14, background: 'rgba(234,67,53,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 2 }}>
-              <strong style={{ color: 'white', fontSize: 13 }}>📋 How to get your Make.com webhook URL:</strong><br />
+              <strong style={{ color: 'white', fontSize: 13 }}>📋 How to set up Make.com:</strong><br />
               1. Go to <a href="https://make.com" target="_blank" style={{ color: '#ea4335' }}>make.com</a> → free account<br />
               2. Create new scenario<br />
               3. Add trigger: <strong style={{ color: 'white' }}>Webhooks → Custom webhook</strong> → copy the URL<br />
               4. Add action: <strong style={{ color: 'white' }}>Google Business Profile → Create Post</strong><br />
               5. Connect your Google account in Make.com<br />
-              6. Map the field <strong style={{ color: 'white' }}>"text"</strong> from webhook to post summary<br />
-              7. Activate the scenario<br />
-              8. Paste the webhook URL above ✅<br /><br />
-              <strong style={{ color: '#10b981' }}>✓ No API approval needed · No token expiry · Free up to 1000 posts/month</strong>
+              6. Map the field <strong style={{ color: 'white' }}>"text"</strong> from webhook to Summary<br />
+              7. Activate the scenario → paste webhook URL above<br /><br />
+              <strong style={{ color: '#10b981' }}>✓ No API approval · No token expiry · Free up to 1000 posts/month</strong>
             </div>
           </>}
 
@@ -158,6 +180,7 @@ export default function ConnectPage() {
         </div>
       </div>
 
+      {/* Connected accounts list */}
       {accounts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 580 }}>
           <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Connected Accounts</h2>
@@ -168,6 +191,7 @@ export default function ConnectPage() {
                 <div style={{ fontWeight: 600 }}>{acc.username}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'capitalize' }}>
                   {acc.platform.replace('_', ' ')}
+                  {acc.pageId && <span style={{ marginLeft: 8, opacity: 0.5 }}>· {acc.pageId.substring(0, 40)}</span>}
                 </div>
               </div>
               <span style={{ padding: '3px 10px', borderRadius: 20, background: (PLATFORM_COLORS[acc.platform] || '#6366f1') + '22', color: PLATFORM_COLORS[acc.platform] || '#6366f1', fontSize: 12 }}>
