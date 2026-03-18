@@ -130,6 +130,14 @@ export default function ConnectPage() {
                 onChange={e => setForm(f => ({ ...f, makeWebhookUrl: e.target.value }))}
               />
             </div>
+            <div>
+  <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--muted)' }}>Location Name</label>
+  <input
+    placeholder="accounts/17540640580516601221/locations/8346233813110252496"
+    value={form.pageId}
+    onChange={e => setForm(f => ({ ...f, pageId: e.target.value }))}
+  />
+</div>
             <div style={{ padding: 14, background: 'rgba(234,67,53,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 2 }}>
               <strong style={{ color: 'white', fontSize: 13 }}>📋 How to get your Make.com webhook URL:</strong><br />
               1. Go to <a href="https://make.com" target="_blank" style={{ color: '#ea4335' }}>make.com</a> → free account<br />
