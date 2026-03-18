@@ -12,6 +12,20 @@ interface PostOptions {
   humanize?: boolean
 }
 
+// Parse extraData — handles single and double stringified JSON
+function parseExtraData(raw: any): any {
+  if (!raw) return {}
+  if (typeof raw === 'object') return raw
+  try {
+    let parsed = JSON.parse(raw)
+    // Double stringified — parse again
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed)
+    return parsed || {}
+  } catch {
+    return {}
+  }
+}
+
 function unwrapProxyUrl(url: string): string {
   if (url.includes('/api/proxy-image')) {
     try {
@@ -74,7 +88,7 @@ async function postToFacebook(options: PostOptions): Promise<string> {
 
 async function postToTwitter(options: PostOptions): Promise<string> {
   const { TwitterApi } = await import('twitter-api-v2')
-  const extraData = options.extraData || {}
+  const extraData = parseExtraData(options.extraData)
   const client = new TwitterApi({
     appKey: extraData.appKey || '',
     appSecret: extraData.appSecret || '',
@@ -85,37 +99,28 @@ async function postToTwitter(options: PostOptions): Promise<string> {
   return `https://twitter.com/i/web/status/${tweet.data.id}`
 }
 
-// Google Business via Make.com webhook — no API approval needed, no token expiry
 async function postToGoogleBusiness(options: PostOptions): Promise<string> {
-  const { text, mediaUrls = [], pageId, extraData } = options
-
-  // Get webhook URL from extraData (stored when account was connected) or env
+  const { text, mediaUrls = [], pageId } = options
+  
+  // Parse extraData — handles double-stringified JSON from DB
+  const extraData = parseExtraData(options.extraData)
   const webhookUrl = extraData?.makeWebhookUrl || process.env.MAKE_WEBHOOK_URL
-  if (!webhookUrl) throw new Error('Make.com webhook URL not configured. Add MAKE_WEBHOOK_URL to your env or account settings.')
+  
+  console.log('[GoogleBusiness] extraData parsed:', JSON.stringify(extraData))
+  console.log('[GoogleBusiness] webhookUrl:', webhookUrl ? webhookUrl.substring(0, 50) + '...' : 'MISSING')
 
-  // Google Business posts max 1500 chars — keep full article + hashtags
+  if (!webhookUrl) throw new Error('Make.com webhook URL not configured.')
+
   const MAX_GB = 1500
   const postText = text.length > MAX_GB ? text.substring(0, MAX_GB - 3) + '...' : text
 
-  // Get photo as base64 if available
-  let photoBase64: string | null = null
   let photoUrl: string | null = null
-  if (mediaUrls.length > 0) {
-    try {
-      const imgBuffer = await fetchImageBuffer(mediaUrls[0])
-      photoBase64 = imgBuffer.toString('base64')
-      photoUrl = mediaUrls[0]
-    } catch (err: any) {
-      console.warn('[GoogleBusiness] Photo failed:', err.message)
-    }
-  }
+  if (mediaUrls.length > 0) photoUrl = mediaUrls[0]
 
-  // Send to Make.com webhook
   const payload = {
     text: postText,
     locationName: pageId || '',
-    photoUrl: photoUrl,
-    photoBase64: photoBase64,
+    photoUrl,
     postedAt: new Date().toISOString(),
   }
 
@@ -126,7 +131,7 @@ async function postToGoogleBusiness(options: PostOptions): Promise<string> {
   })
 
   if (!res.ok) throw new Error(`Make.com webhook failed: ${res.status}`)
-  console.log('[GoogleBusiness] Sent to Make.com webhook ✅')
+  console.log('[GoogleBusiness] ✅ Sent to Make.com')
   return 'google_business_posted'
 }
 
@@ -134,8 +139,8 @@ export async function sendPost(options: PostOptions): Promise<string> {
   if (options.humanize) await randomDelay(1000, 3000)
 
   switch (options.platform) {
-    case 'facebook':      return postToFacebook(options)
-    case 'twitter':       return postToTwitter(options)
+    case 'facebook':        return postToFacebook(options)
+    case 'twitter':         return postToTwitter(options)
     case 'google_business': return postToGoogleBusiness(options)
     default:
       throw new Error(`Platform ${options.platform} not supported`)
