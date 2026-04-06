@@ -4,8 +4,10 @@ interface WordPressPost {
   title: string
   content: string
   metaDescription: string
+  metaTitle: string
   slug: string
   focusKeyword: string
+  secondaryKeywords: string[]
   tags: string[]
   categories: string[]
 }
@@ -17,10 +19,16 @@ interface CompanyInfo {
   website?: string | null
 }
 
+interface ExistingPost {
+  title: string
+  slug: string
+  url: string
+}
+
 function getServiceDetails(keyword: string) {
   const k = keyword.toLowerCase()
   if (k.includes('vitrier') || k.includes('vitrage') || k.includes('vitre')) return {
-    services: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'isolation thermique', 'fenêtres alu'],
+    services: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'isolation thermique', 'fenêtres aluminium'],
     faqPool: [
       'Combien coûte un remplacement de vitre ?',
       'Intervenez-vous en urgence le week-end ?',
@@ -30,6 +38,14 @@ function getServiceDetails(keyword: string) {
       'Pouvez-vous remplacer une vitre feuilletée ?',
       'Quel délai pour un devis vitrage ?',
       'Travaillez-vous avec les assurances pour bris de glace ?',
+      'Quel est le prix d\'un double vitrage par fenêtre ?',
+      'Intervenez-vous pour les baies vitrées ?',
+    ],
+    // LSI keywords — related semantic keywords for Yoast
+    lsiKeywords: [
+      'vitrier urgence', 'bris de glace', 'double vitrage prix', 'remplacement fenêtre',
+      'vitre cassée', 'miroitier', 'pose fenêtre PVC', 'vitrage isolation',
+      'fenêtre alu', 'vitrier pas cher', 'urgence vitrage', 'fenêtre double vitrage',
     ],
     localContext: 'vitrier, vitrerie, miroiterie, pose fenêtres',
   }
@@ -44,6 +60,13 @@ function getServiceDetails(keyword: string) {
       'Quelle différence entre serrure 3 et 5 points ?',
       'Comment choisir un serrurier de confiance ?',
       'Remplacez-vous aussi les cylindres ?',
+      'Quel est le prix d\'un blindage de porte ?',
+      'Intervenez-vous pour les locaux commerciaux ?',
+    ],
+    lsiKeywords: [
+      'serrurier urgence', 'ouverture porte', 'serrure claquée', 'serrurier pas cher',
+      'changer serrure', 'porte blindée', 'cylindre serrure', 'dépannage serrurier',
+      'serrurier 24h', 'serrurier agréé', 'blindage porte', 'serrure multipoints prix',
     ],
     localContext: 'serrurier, serrurerie, dépannage serrurerie, sécurité',
   }
@@ -57,6 +80,10 @@ function getServiceDetails(keyword: string) {
       'La fuite est couverte par mon assurance ?',
       'Intervenez-vous pour les copropriétés ?',
     ],
+    lsiKeywords: [
+      'plombier urgence', 'fuite eau', 'débouchage', 'chauffe-eau', 'plombier pas cher',
+      'dépannage plomberie', 'plombier 24h', 'robinetterie', 'salle de bain rénovation',
+    ],
     localContext: 'plombier, plomberie, dépannage, fuite eau',
   }
   if (k.includes('electricien') || k.includes('électricien')) return {
@@ -68,226 +95,241 @@ function getServiceDetails(keyword: string) {
       'Peut-on installer un tableau électrique soi-même ?',
       'Combien coûte une mise aux normes électrique ?',
     ],
+    lsiKeywords: [
+      'électricien urgence', 'dépannage électrique', 'tableau électrique', 'mise aux normes',
+      'électricien pas cher', 'installation électrique', 'borne recharge', 'électricien 24h',
+    ],
     localContext: 'électricien, électricité, dépannage électrique',
   }
   return {
-    services: ['intervention rapide', 'devis gratuit', 'garantie travaux', 'artisan qualifié', 'service d\'urgence'],
+    services: ['intervention rapide', 'devis gratuit', 'garantie travaux', 'artisan qualifié'],
     faqPool: ['Quels sont vos tarifs ?', 'Proposez-vous des devis gratuits ?', 'Quelle est votre zone d\'intervention ?'],
+    lsiKeywords: ['artisan local', 'dépannage urgent', 'devis gratuit', 'intervention rapide'],
     localContext: 'artisan, professionnel, dépannage',
   }
 }
 
-// Random pick from array
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
-function pickN<T>(arr: T[], n: number): T[] {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, n)
-}
+function pickN<T>(arr: T[], n: number): T[] { return [...arr].sort(() => Math.random() - 0.5).slice(0, n) }
 
-// Different article angles/structures
 const ARTICLE_ANGLES = [
-  'guide_complet',      // Complete guide
-  'urgence_focus',      // Focus on emergency/urgency
-  'prix_tarifs',        // Price/cost focused
-  'comparatif',         // Comparison article
-  'conseils_pro',       // Professional tips
-  'pourquoi_choisir',   // Why choose us
-  'avant_apres',        // Before/after approach
-  'saison',             // Seasonal angle
+  'guide_complet', 'urgence_focus', 'prix_tarifs', 'comparatif',
+  'conseils_pro', 'pourquoi_choisir', 'avant_apres', 'saison',
 ]
 
-const INTRO_HOOKS = [
-  'Vous cherchez un {service} de confiance à {city} ?',
-  'Une urgence {service} à {city} ? Voici ce que vous devez savoir.',
-  'Choisir le bon {service} à {city} peut faire toute la différence.',
-  'Votre {service} à {city} : tout ce qu\'il faut savoir avant d\'appeler.',
-  '{city} : notre équipe de {service} intervient rapidement.',
-  'Besoin d\'un {service} professionnel à {city} ? Lisez ceci avant tout.',
-]
+// Fetch existing posts from WordPress for internal linking
+async function getExistingWordPressPosts(siteUrl: string, username: string, appPassword: string): Promise<ExistingPost[]> {
+  try {
+    const authHeader = `Basic ${Buffer.from(`${username}:${appPassword}`).toString('base64')}`
+    const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts?per_page=20&status=publish&_fields=id,title,slug,link`, {
+      headers: { 'Authorization': authHeader },
+    })
+    if (!res.ok) return []
+    const posts = await res.json()
+    return posts.map((p: any) => ({
+      title: p.title?.rendered || '',
+      slug: p.slug || '',
+      url: p.link || '',
+    }))
+  } catch {
+    return []
+  }
+}
 
 export async function generateWordPressPost(
   keyword: string,
   language: string,
-  company: CompanyInfo
+  company: CompanyInfo,
+  siteUrl?: string,
+  username?: string,
+  appPassword?: string
 ): Promise<WordPressPost> {
 
-  const { services, faqPool, localContext } = getServiceDetails(keyword)
+  const { services, faqPool, lsiKeywords, localContext } = getServiceDetails(keyword)
   const angle = pick(ARTICLE_ANGLES)
   const selectedFaqs = pickN(faqPool, 4)
-  const selectedServices = pickN(services, Math.floor(Math.random() * 3) + 3) // 3-5 services
+  const selectedServices = pickN(services, Math.floor(Math.random() * 3) + 3)
 
-  const cityMatch = keyword.match(/\b(à|a|en|near|in|sur|chez)\s+([A-ZÀ-Ü][a-zà-ü\-]+(?:\s+[A-ZÀ-Ü][a-zà-ü\-]+)*)/i)
-  const city = cityMatch ? cityMatch[2] : 'votre ville'
+  // Pick a DIFFERENT focus keyword from LSI list each time
+  const cityMatch = keyword.match(/\b(à|a|en|near|in|sur)\s+([A-ZÀ-Ü][a-zà-ü\-]+(?:\s+[A-ZÀ-Ü][a-zà-ü\-]+)*)/i)
+  const city = cityMatch ? cityMatch[2] : ''
   const serviceName = keyword.split(' ')[0]
+
+  // Generate LSI keywords with city
+  const lsiWithCity = lsiKeywords.map(k => city ? `${k} ${city}` : k)
+  const allKeywords = [keyword, ...lsiWithCity]
+
+  // Pick focus keyword — rotate through LSI keywords so each article targets a different one
+  const keywordIndex = Math.floor(Math.random() * Math.min(4, allKeywords.length))
+  const focusKeyword = keywordIndex === 0 ? keyword : lsiWithCity[keywordIndex - 1]
+  const secondaryKeywords = pickN(allKeywords.filter(k => k !== focusKeyword), 5)
 
   const companyName = company.name || 'notre équipe'
   const companyPhone = company.phone || ''
   const companyAddress = company.address || city
   const companyWebsite = company.website || ''
 
-  const hook = pick(INTRO_HOOKS).replace('{service}', serviceName).replace('{city}', city)
-
-  // Different title formats based on angle
-  const titleFormats: Record<string, string[]> = {
-    guide_complet: [
-      `${keyword} : Guide Complet ${new Date().getFullYear()}`,
-      `Tout savoir sur le ${serviceName} à ${city}`,
-      `Guide complet : choisir son ${serviceName} à ${city}`,
-    ],
-    urgence_focus: [
-      `${keyword} urgence — Intervention rapide 24h/7j`,
-      `Urgence ${serviceName} à ${city} : qui appeler ?`,
-      `${serviceName} d'urgence à ${city} — On se déplace vite`,
-    ],
-    prix_tarifs: [
-      `Prix ${serviceName} à ${city} — Tarifs ${new Date().getFullYear()}`,
-      `Combien coûte un ${serviceName} à ${city} ?`,
-      `Tarifs ${keyword} : ce qu'il faut savoir`,
-    ],
-    comparatif: [
-      `Comment choisir son ${serviceName} à ${city} ?`,
-      `${serviceName} à ${city} : les critères pour bien choisir`,
-      `Quel ${serviceName} choisir à ${city} en ${new Date().getFullYear()} ?`,
-    ],
-    conseils_pro: [
-      `${keyword} : Conseils de professionnels`,
-      `Les conseils de votre ${serviceName} à ${city}`,
-      `${serviceName} à ${city} : ce que les pros ne vous disent pas`,
-    ],
-    pourquoi_choisir: [
-      `Pourquoi choisir ${companyName} pour votre ${serviceName} à ${city} ?`,
-      `${keyword} — Faites confiance aux experts locaux`,
-      `Votre ${serviceName} de confiance à ${city}`,
-    ],
-    avant_apres: [
-      `${keyword} : avant et après l'intervention`,
-      `Ce que change un bon ${serviceName} à ${city}`,
-      `${serviceName} à ${city} : résultats garantis`,
-    ],
-    saison: [
-      `${keyword} : nos conseils pour ${pick(['l\'hiver', 'l\'été', 'le printemps', 'l\'automne'])}`,
-      `Préparez votre ${serviceName} à ${city} avant la saison`,
-      `${serviceName} à ${city} — Interventions toute l'année`,
-    ],
+  // Get existing posts for internal linking
+  let existingPosts: ExistingPost[] = []
+  if (siteUrl && username && appPassword) {
+    existingPosts = await getExistingWordPressPosts(siteUrl, username, appPassword)
+    console.log(`[WordPress] Found ${existingPosts.length} existing posts for internal linking`)
   }
 
-  const titleOptions = titleFormats[angle] || titleFormats.guide_complet
-  const titleBase = pick(titleOptions)
+  // Build internal links section
+  const internalLinksHtml = existingPosts.length > 0
+    ? `\n<h2>Articles liés</h2>\n<ul>\n${pickN(existingPosts, Math.min(3, existingPosts.length)).map(p => `<li><a href="${p.url}" title="${p.title}">${p.title}</a></li>`).join('\n')}\n</ul>\n`
+    : ''
+
+  // Different meta title formats
+  const metaTitleFormats = [
+    `${focusKeyword} | ${companyName}`,
+    `${focusKeyword} — Intervention rapide à ${city}`,
+    `${companyName} : ${focusKeyword} ${city ? `à ${city}` : ''}`,
+    `${focusKeyword} : Devis gratuit | ${companyName}`,
+    `Expert ${focusKeyword} ${city ? `à ${city}` : ''} | ${companyName}`,
+  ]
+  const metaTitle = pick(metaTitleFormats).substring(0, 60)
+
+  // Different meta description formats
+  const metaDescFormats = [
+    `${companyName}, votre expert ${focusKeyword}${city ? ` à ${city}` : ''}. ${pick(['Intervention rapide', 'Devis gratuit', 'Urgence 24h/7j', 'Artisan qualifié'])}. ☎ ${companyPhone}`,
+    `Besoin d'un ${focusKeyword}${city ? ` à ${city}` : ''} ? ${companyName} intervient rapidement. Devis gratuit. ${companyPhone ? `Appelez le ${companyPhone}` : 'Contactez-nous'}`,
+    `${focusKeyword}${city ? ` à ${city}` : ''} : faites confiance à ${companyName}. ${pick(['Prix transparents', 'Garantie satisfaction', 'Artisans certifiés'])}. ☎ ${companyPhone}`,
+  ]
+  const metaDescription = pick(metaDescFormats).substring(0, 160)
+
+  // Title formats per angle
+  const titleByAngle: Record<string, string[]> = {
+    guide_complet: [`${focusKeyword} : Guide Complet ${new Date().getFullYear()}`, `Tout savoir sur le ${serviceName}${city ? ` à ${city}` : ''}`, `Guide pratique : ${focusKeyword}`],
+    urgence_focus: [`${focusKeyword} urgence — Intervention 24h/7j`, `Urgence ${serviceName}${city ? ` à ${city}` : ''} : on intervient vite`, `${serviceName} d'urgence : appelez ${companyName}`],
+    prix_tarifs: [`Prix ${focusKeyword} ${new Date().getFullYear()} — Tarifs transparents`, `Combien coûte un ${serviceName}${city ? ` à ${city}` : ''} ?`, `Tarifs ${focusKeyword} : ce qu'il faut savoir`],
+    comparatif: [`Comment choisir son ${serviceName}${city ? ` à ${city}` : ''} ?`, `${serviceName} : les critères pour bien choisir`, `Quel ${serviceName} choisir en ${new Date().getFullYear()} ?`],
+    conseils_pro: [`${focusKeyword} : Conseils de professionnels`, `Les conseils de votre ${serviceName}`, `${serviceName} : ce que les pros recommandent`],
+    pourquoi_choisir: [`Pourquoi choisir ${companyName} pour votre ${serviceName} ?`, `${focusKeyword} — Expertise et confiance`, `Votre ${serviceName} de confiance${city ? ` à ${city}` : ''}`],
+    avant_apres: [`${focusKeyword} : avant et après l'intervention`, `Ce que change un bon ${serviceName}`, `${serviceName} : résultats garantis`],
+    saison: [`${focusKeyword} : nos conseils saisonniers`, `${serviceName} : préparez-vous à temps`, `${focusKeyword} — Interventions toute l'année`],
+  }
+
+  const title = pick(titleByAngle[angle] || titleByAngle.guide_complet)
+  const slug = `${focusKeyword.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}-${Date.now().toString().slice(-6)}`
 
   const raw = await aiChat([
     {
       role: 'system',
-      content: `Tu es un expert SEO et rédacteur web. Tu écris UNIQUEMENT en ${language}. Tu crées des articles de blog différents à chaque fois, avec des angles variés et du contenu unique. Tu ne répètes jamais le même article. Tu suis exactement le format demandé.`,
+      content: `Tu es un expert SEO et rédacteur web. Tu écris UNIQUEMENT en ${language}. Tu crées des articles 100% uniques avec des angles variés. Tu intègres naturellement les mots-clés secondaires sans sur-optimisation. Tu suis exactement le format demandé.`,
     },
     {
       role: 'user',
-      content: `Écris un article de blog SEO UNIQUE pour: "${keyword}"
-      
-ANGLE DE L'ARTICLE: ${angle} — ${hook}
-TITRE SUGGÉRÉ: ${titleBase}
+      content: `Écris un article de blog SEO UNIQUE pour le mot-clé principal: "${focusKeyword}"
+
+ANGLE: ${angle}
+TITRE: ${title}
+MOTS-CLÉS SECONDAIRES à intégrer naturellement: ${secondaryKeywords.join(', ')}
 
 ENTREPRISE:
 - Nom: ${companyName}
-- Téléphone: ${companyPhone}  
+- Téléphone: ${companyPhone}
 - Adresse: ${companyAddress}
 ${companyWebsite ? `- Site: ${companyWebsite}` : ''}
 
-SERVICES À METTRE EN AVANT (ces services spécifiques cette fois): ${selectedServices.join(', ')}
+SERVICES À METTRE EN AVANT: ${selectedServices.join(', ')}
 
-FAQ À TRAITER (ces questions spécifiques): 
+FAQ:
 ${selectedFaqs.map((q, i) => `${i + 1}. ${q}`).join('\n')}
-
-IMPORTANT: L'article doit être DIFFÉRENT des articles génériques — utilise l'angle "${angle}" pour créer un contenu unique et engageant.
 
 FORMAT EXACT:
 
-###TITLE###
-${titleBase}
-
-###METADESC###
-[Meta description 150-160 caractères unique avec le mot-clé et un appel à l'action]
-
-###SLUG###
-[slug-unique-avec-tirets-et-date-ou-angle]
-
-###TAGS###
-[12-15 tags variés séparés par virgules]
-
 ###CONTENT###
-<h1>${titleBase}</h1>
+<h1>${title}</h1>
 
-<p>${hook} ${companyName} vous répond avec expertise et rapidité. Découvrez tout ce qu'il faut savoir.</p>
+<p>[Introduction 2-3 phrases avec "${focusKeyword}" naturellement intégré. Accroche basée sur l'angle ${angle}.]</p>
 
-<h2>Nos services de ${serviceName} à ${city}</h2>
-<p>[Description engageante des services sélectionnés avec l'angle ${angle}. 3-4 phrases originales.]</p>
+<h2>Services de ${serviceName}${city ? ` à ${city}` : ''} : notre expertise</h2>
+<p>[Description des services: ${selectedServices.join(', ')}. 3-4 phrases originales avec mots-clés secondaires intégrés naturellement.]</p>
 <ul>
-${selectedServices.map(s => `<li><strong>${s}</strong> : [description spécifique et utile]</li>`).join('\n')}
+${selectedServices.map(s => `<li><strong>${s}</strong> : [description concrète et utile 1-2 phrases]</li>`).join('\n')}
 </ul>
 
-<h2>[H2 unique basé sur l'angle ${angle}]</h2>
-<p>[Contenu original et utile, 3-4 phrases. Évite les formulations génériques.]</p>
+<h2>[H2 original basé sur l'angle "${angle}" — différent du précédent]</h2>
+<p>[Contenu de 3-4 phrases avec au moins 1 mot-clé secondaire: ${secondaryKeywords[0] || ''}]</p>
 
-<h2>Zone d'intervention : ${city} et communes voisines</h2>
-<p>[Paragraphe sur la zone géographique avec noms de villes proches de ${city}]</p>
+<h2>Tarifs et devis ${serviceName}${city ? ` à ${city}` : ''}</h2>
+<p>[Information transparente sur les prix, devis gratuit, facteurs influençant le coût. 3 phrases.]</p>
 
-<h2>Questions fréquentes sur le ${serviceName} à ${city}</h2>
-${selectedFaqs.map(q => `<h3>${q}</h3>\n<p>[Réponse concrète, honnête et utile — 2-3 phrases]</p>`).join('\n\n')}
+<h2>Zone d'intervention${city ? ` : ${city}` : ''} et alentours</h2>
+<p>[Noms de villes voisines de ${city || 'la région'}, disponibilité, temps d'intervention. 2-3 phrases.]</p>
 
-<h2>Contactez ${companyName} — ${serviceName} à ${city}</h2>
-<p>[CTA personnalisé avec l'angle ${angle}. Coordonnées complètes.]</p>
+<h2>Questions fréquentes — ${focusKeyword}</h2>
+${selectedFaqs.map(q => `<h3>${q}</h3>\n<p>[Réponse précise et honnête 2-3 phrases. Intègre un mot-clé secondaire si possible.]</p>`).join('\n\n')}
+
+<h2>Contactez ${companyName}${city ? ` à ${city}` : ''}</h2>
+<p>[CTA fort et personnalisé. Résumé de la valeur ajoutée. 2 phrases.]</p>
 <p>📞 <strong>${companyPhone}</strong><br>
-📍 ${companyAddress}${companyWebsite ? `<br>🌐 <a href="${companyWebsite}">${companyWebsite}</a>` : ''}</p>
+📍 ${companyAddress}${companyWebsite ? `<br>🌐 <a href="${companyWebsite}" title="${serviceName} ${city}">${companyWebsite}</a>` : ''}</p>
 
 ###END###`,
     },
-    { role: 'assistant', content: '###TITLE###' },
-  ], 0.9) // Higher temperature for more variety
+    { role: 'assistant', content: '###CONTENT###' },
+  ], 0.9)
 
-  const fullRaw = '###TITLE###' + raw
+  const fullRaw = '###CONTENT###' + raw
+  const contentMatch = fullRaw.match(/###CONTENT###\s*([\s\S]*?)\s*###END###/)
+  let content = contentMatch ? contentMatch[1].trim() : fullRaw.replace('###CONTENT###', '').replace('###END###', '').trim()
 
-  const extract = (tag: string, nextTag: string) => {
-    const regex = new RegExp(`###${tag}###\\s*([\\s\\S]*?)\\s*###${nextTag}###`)
-    const match = fullRaw.match(regex)
-    return match ? match[1].trim() : ''
+  // Add internal links section
+  if (internalLinksHtml) {
+    content += internalLinksHtml
   }
 
-  const title = extract('TITLE', 'METADESC') || titleBase
-  const metaDescription = extract('METADESC', 'SLUG')
-  const slugRaw = extract('SLUG', 'TAGS')
-  const slug = slugRaw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').substring(0, 80)
-  const tagsRaw = extract('TAGS', 'CONTENT')
-  let content = extract('CONTENT', 'END')
-
-  // Add schema markup
+  // Add schema markup for LocalBusiness + Article
   const schemaMarkup = `
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "${companyName}",
-  "description": "${metaDescription.replace(/"/g, '\\"')}",
-  ${companyPhone ? `"telephone": "${companyPhone}",` : ''}
-  ${companyAddress ? `"address": {"@type": "PostalAddress", "streetAddress": "${companyAddress}"},` : ''}
-  ${companyWebsite ? `"url": "${companyWebsite}",` : ''}
-  "priceRange": "$$",
-  "openingHours": "Mo-Su 00:00-24:00",
-  "areaServed": "${city}"
+  "@graph": [
+    {
+      "@type": "LocalBusiness",
+      "name": "${companyName}",
+      "description": "${metaDescription.replace(/"/g, '\\"')}",
+      ${companyPhone ? `"telephone": "${companyPhone}",` : ''}
+      ${companyAddress ? `"address": {"@type": "PostalAddress", "streetAddress": "${companyAddress}", "addressLocality": "${city}"},` : ''}
+      ${companyWebsite ? `"url": "${companyWebsite}",` : ''}
+      "priceRange": "$$",
+      "openingHours": "Mo-Su 00:00-24:00",
+      "areaServed": "${city || 'France'}"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        ${selectedFaqs.map(q => `{"@type": "Question", "name": "${q.replace(/"/g, '\\"')}", "acceptedAnswer": {"@type": "Answer", "text": "Contactez ${companyName} pour obtenir une réponse personnalisée. ${companyPhone}"}}`).join(',\n        ')}
+      ]
+    }
+  ]
 }
 </script>`
 
   content = content + '\n\n' + schemaMarkup
 
-  const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
+  const tags = [...new Set([
+    ...secondaryKeywords,
+    focusKeyword,
+    serviceName,
+    ...(city ? [city, `${serviceName} ${city}`] : []),
+    'devis gratuit', 'artisan local'
+  ])].slice(0, 15)
 
-  console.log(`[WordPress] Generated: angle=${angle} | title=${title} | content=${content.length} chars`)
+  console.log(`[WordPress] angle=${angle} | focus="${focusKeyword}" | secondary=[${secondaryKeywords.join(', ')}] | content=${content.length} chars`)
 
   return {
     title,
     content,
-    metaDescription: metaDescription || `${companyName} - ${keyword}. ${pick(['Intervention rapide', 'Devis gratuit', 'Urgence 24h/7j'])}. Appelez-nous !`,
-    slug: slug || `${serviceName}-${city}-${Date.now()}`.toLowerCase().replace(/\s+/g, '-'),
-    focusKeyword: keyword,
+    metaDescription,
+    metaTitle,
+    slug,
+    focusKeyword,
+    secondaryKeywords,
     tags,
-    categories: [serviceName, localContext.split(',')[0].trim()],
+    categories: [serviceName, city || localContext.split(',')[0].trim()].filter(Boolean),
   }
 }

@@ -124,16 +124,11 @@ async function postToGoogleBusiness(options: PostOptions): Promise<string> {
 
 async function postToWordPress(options: PostOptions): Promise<string> {
   const extraData = parseExtraData(options.extraData)
-  
-  // siteUrl can be in extraData or pageId
   const siteUrl = (extraData?.siteUrl || options.pageId || '').replace(/\/$/, '')
   const username = extraData?.username
   const appPassword = options.accessToken
 
-  console.log('[WordPress] siteUrl:', siteUrl)
-  console.log('[WordPress] username:', username)
-  console.log('[WordPress] text length:', options.text.length)
-  console.log('[WordPress] text preview:', options.text.substring(0, 100))
+  console.log('[WordPress] siteUrl:', siteUrl, '| username:', username, '| text length:', options.text.length)
 
   if (!siteUrl) throw new Error('WordPress site URL is required')
   if (!username) throw new Error('WordPress username is required')
@@ -141,30 +136,33 @@ async function postToWordPress(options: PostOptions): Promise<string> {
 
   const authHeader = `Basic ${Buffer.from(`${username}:${appPassword}`).toString('base64')}`
 
-  // Parse SEO post data from JSON
+  // Parse SEO post data
   let title = ''
   let content = ''
   let excerpt = ''
+  let metaTitle = ''
   let slug = ''
   let tags: string[] = []
   let focusKeyword = ''
+  let secondaryKeywords: string[] = []
 
   const rawText = options.text.trim()
-  
-  // Try to parse as JSON (WordPress SEO post)
-  if (rawText.startsWith('{') || rawText.startsWith('"{"')) {
+  if (rawText.startsWith('{') || rawText.startsWith('"{"') || rawText.startsWith('"{\\"')) {
     try {
-      // Handle double-stringified JSON
-      let parsed = rawText.startsWith('"') ? JSON.parse(JSON.parse(rawText)) : JSON.parse(rawText)
-      title = parsed.title || ''
-      content = parsed.content || ''
-      excerpt = parsed.metaDescription || ''
-      slug = parsed.slug || ''
-      tags = parsed.tags || []
-      focusKeyword = parsed.focusKeyword || ''
-      console.log('[WordPress] Parsed JSON — title:', title, '| content length:', content.length)
+      let parsed = rawText
+      if (rawText.startsWith('"')) parsed = JSON.parse(rawText)
+      const data = typeof parsed === 'string' ? JSON.parse(parsed) : parsed
+      title = data.title || ''
+      content = data.content || ''
+      excerpt = data.metaDescription || ''
+      metaTitle = data.metaTitle || title
+      slug = data.slug || ''
+      tags = data.tags || []
+      focusKeyword = data.focusKeyword || ''
+      secondaryKeywords = data.secondaryKeywords || []
+      console.log('[WordPress] Parsed: title=', title, '| content=', content.length, 'chars | focus=', focusKeyword)
     } catch (e: any) {
-      console.error('[WordPress] JSON parse failed:', e.message)
+      console.error('[WordPress] JSON parse failed:', e.message, '| raw preview:', rawText.substring(0, 200))
       content = rawText
       title = `Article — ${new Date().toLocaleDateString('fr-FR')}`
     }
@@ -173,8 +171,8 @@ async function postToWordPress(options: PostOptions): Promise<string> {
     title = `Article — ${new Date().toLocaleDateString('fr-FR')}`
   }
 
-  if (!content || content.length < 50) {
-    throw new Error(`WordPress: content is empty or too short (${content.length} chars). JSON parse may have failed.`)
+  if (!content || content.length < 100) {
+    throw new Error(`WordPress content too short (${content.length} chars). Check JSON parsing.`)
   }
 
   // Upload featured image
@@ -185,17 +183,19 @@ async function postToWordPress(options: PostOptions): Promise<string> {
       const imgForm = new FormData()
       imgForm.append('file', new Blob([imgBuffer], { type: 'image/jpeg' }), 'featured.jpg')
       imgForm.append('alt_text', focusKeyword || title)
+      imgForm.append('caption', title)
+      imgForm.append('description', excerpt)
       const uploadRes = await fetch(`${siteUrl}/wp-json/wp/v2/media`, {
         method: 'POST', headers: { 'Authorization': authHeader }, body: imgForm,
       })
       const uploadData = await uploadRes.json()
-      if (uploadData.id) { featuredMediaId = uploadData.id; console.log('[WordPress] Image uploaded:', uploadData.id) }
-    } catch (err: any) { console.warn('[WordPress] Image upload failed:', err.message) }
+      if (uploadData.id) { featuredMediaId = uploadData.id; console.log('[WordPress] Image:', uploadData.id) }
+    } catch (err: any) { console.warn('[WordPress] Image failed:', err.message) }
   }
 
   // Create tags
   const tagIds: number[] = []
-  for (const tag of tags.slice(0, 10)) {
+  for (const tag of tags.slice(0, 12)) {
     try {
       const tagRes = await fetch(`${siteUrl}/wp-json/wp/v2/tags`, {
         method: 'POST', headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
@@ -207,7 +207,7 @@ async function postToWordPress(options: PostOptions): Promise<string> {
     } catch {}
   }
 
-  // Create post
+  // Build post with full Yoast SEO + Rank Math meta
   const postBody: any = {
     title,
     content,
@@ -215,25 +215,34 @@ async function postToWordPress(options: PostOptions): Promise<string> {
     excerpt,
     tags: tagIds.filter(Boolean),
     meta: {
+      // Yoast SEO fields
       _yoast_wpseo_focuskw: focusKeyword,
       _yoast_wpseo_metadesc: excerpt,
-      _yoast_wpseo_title: title,
-      _rank_math_focus_keyword: focusKeyword,
-      _rank_math_description: excerpt,
+      _yoast_wpseo_title: metaTitle || title,
+      _yoast_wpseo_meta_robots_noindex: '0',
+      _yoast_wpseo_meta_robots_nofollow: '0',
+      // Rank Math fields  
+      rank_math_focus_keyword: [focusKeyword, ...secondaryKeywords.slice(0, 3)].join(','),
+      rank_math_description: excerpt,
+      rank_math_title: metaTitle || title,
+      rank_math_robots: ['index', 'follow'],
+      // All In One SEO fields (bonus)
+      _aioseo_title: metaTitle || title,
+      _aioseo_description: excerpt,
+      _aioseo_keywords: [focusKeyword, ...secondaryKeywords].join(','),
     },
   }
+
   if (slug) postBody.slug = slug
   if (featuredMediaId) postBody.featured_media = featuredMediaId
-
-  console.log('[WordPress] Creating post with title:', title, '| content length:', content.length)
 
   const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts`, {
     method: 'POST', headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
     body: JSON.stringify(postBody),
   })
   const data = await res.json()
-  console.log('[WordPress] Response:', data.id, data.link, data.code)
   if (data.code && data.message) throw new Error(`WordPress error: ${data.message}`)
+  console.log('[WordPress] ✅ Published:', data.link)
   return data.link || `${siteUrl}/?p=${data.id}`
 }
 

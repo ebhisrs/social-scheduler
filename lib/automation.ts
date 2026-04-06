@@ -6,23 +6,31 @@ import path from 'path'
 
 const DAYS_OF_WEEK = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
+function parseExtraData(raw: any): any {
+  if (!raw) return {}
+  if (typeof raw === 'object') return raw
+  try {
+    let parsed = JSON.parse(raw)
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed)
+    return parsed || {}
+  } catch { return {} }
+}
+
 function buildFinalPost(postText: string, hashtags: string[]): string {
-  const hashLine = hashtags.map(h => `#${h}`).join(' ')
-  return `${postText.trim()}\n\n${hashLine}`
+  return `${postText.trim()}\n\n${hashtags.map(h => `#${h}`).join(' ')}`
 }
 
 function stripPreamble(text: string): string {
   const lines = text.split('\n')
-  const skipPatterns = [
-    /^(okay|ok|sure|certainly|absolutely|bien sûr|parfait|d'accord|voici|voilà|here|absolument|avec plaisir)/i,
-    /^(je vous propose|je propose|voici une proposition|here is|here's|let me)/i,
-    /^(post publicitaire|un post|une publication|ce post|ce texte)/i,
+  const skip = [
+    /^(okay|ok|sure|certainly|absolutely|bien sûr|parfait|d'accord|voici|voilà|here|absolument)/i,
+    /^(je vous propose|here is|here's|let me|post publicitaire)/i,
   ]
   let start = 0
   for (let i = 0; i < Math.min(lines.length, 3); i++) {
     const line = lines[i].trim()
     if (!line) { start = i + 1; continue }
-    if (skipPatterns.some(p => p.test(line))) { start = i + 1 } else break
+    if (skip.some(p => p.test(line))) { start = i + 1 } else break
   }
   return lines.slice(start).join('\n').trim()
 }
@@ -39,8 +47,7 @@ async function sendFailureEmail(email: string, accountName: string, error: strin
       auth: { user: smtpUser, pass: smtpPass },
     })
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || smtpUser,
-      to: email,
+      from: process.env.SMTP_FROM || smtpUser, to: email,
       subject: `Auto-post failed on ${accountName}`,
       html: `<p><b>Account:</b> ${accountName}</p><p><b>Keyword:</b> ${keyword}</p><p><b>Error:</b> ${error}</p>`,
     })
@@ -48,24 +55,16 @@ async function sendFailureEmail(email: string, accountName: string, error: strin
 }
 
 interface CompanyInfo {
-  name?: string | null
-  phone?: string | null
-  address?: string | null
-  website?: string | null
+  name?: string | null; phone?: string | null; address?: string | null; website?: string | null
 }
 
 function getServicesHint(keyword: string): string {
   const k = keyword.toLowerCase()
-  if (k.includes('vitrier') || k.includes('vitrage') || k.includes('vitre'))
-    return 'remplacement de vitre, double vitrage, vitrage simple, bris de glace urgence, fenêtres, baies vitrées'
-  if (k.includes('serrurier') || k.includes('serrure'))
-    return "ouverture de porte claquée, changement de serrure, serrure multipoints, urgence 24h/7j, blindage de porte"
-  if (k.includes('plombier') || k.includes('plomberie'))
-    return "fuite d'eau urgence, débouchage canalisation, chauffe-eau, robinetterie, salle de bain"
-  if (k.includes('electricien') || k.includes('électricien') || k.includes('electr'))
-    return 'dépannage électrique, tableau électrique, mise aux normes, prises, éclairage'
-  if (k.includes('peintre') || k.includes('peinture'))
-    return 'peinture intérieure, peinture extérieure, ravalement de façade, papier peint, rénovation'
+  if (k.includes('vitrier') || k.includes('vitre')) return 'remplacement de vitre, double vitrage, bris de glace urgence, fenêtres, baies vitrées'
+  if (k.includes('serrurier')) return "ouverture de porte claquée, changement de serrure, urgence 24h/7j, blindage de porte"
+  if (k.includes('plombier')) return "fuite d'eau urgence, débouchage canalisation, chauffe-eau, robinetterie"
+  if (k.includes('electricien') || k.includes('électricien')) return 'dépannage électrique, tableau électrique, mise aux normes'
+  if (k.includes('peintre')) return 'peinture intérieure, peinture extérieure, ravalement de façade'
   return ''
 }
 
@@ -73,15 +72,14 @@ function buildFallbackHashtags(keyword: string): string[] {
   const words = keyword.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter((w: string) => w.length > 2)
   const tags = [...words]
   const k = keyword.toLowerCase()
-  if (k.includes('vitrier') || k.includes('vitre')) tags.push('vitrage', 'doublevitrage', 'brisdeglace', 'vitrerie', 'fenetres')
-  if (k.includes('serrurier')) tags.push('serrurerie', 'ouverturedeporte', 'urgence', 'serrure', 'depannage')
-  if (k.includes('plombier')) tags.push('plomberie', 'fuitedeau', 'debouchage', 'urgence', 'depannage')
-  if (k.includes('electr')) tags.push('electricite', 'depannageelectrique', 'electricien', 'installation')
-  tags.push('artisan', 'devisgratuit', 'interventionrapide')
+  if (k.includes('vitrier') || k.includes('vitre')) tags.push('vitrage', 'doublevitrage', 'brisdeglace', 'vitrerie')
+  if (k.includes('serrurier')) tags.push('serrurerie', 'ouverturedeporte', 'urgence', 'serrure')
+  if (k.includes('plombier')) tags.push('plomberie', 'fuitedeau', 'debouchage', 'urgence')
+  if (k.includes('electr')) tags.push('electricite', 'depannageelectrique', 'electricien')
+  tags.push('artisan', 'devisgratuit')
   return [...new Set(tags)].slice(0, 10)
 }
 
-// Generate short social media post
 export async function generateArticle(keyword: string, language: string, tone: string, company: CompanyInfo): Promise<string> {
   const servicesHint = getServicesHint(keyword)
   const companyLines: string[] = []
@@ -92,22 +90,8 @@ export async function generateArticle(keyword: string, language: string, tone: s
   const companyClosing = companyLines.join(' | ')
 
   const raw = await aiChat([
-    {
-      role: 'system',
-      content: `Tu es un rédacteur publicitaire expert pour artisans locaux. Tu écris UNIQUEMENT en ${language}. RÈGLE ABSOLUE N°1: tu produis UNIQUEMENT le texte du post, sans aucune phrase d'intro. JAMAIS de "Voici", "Here is", "Absolument". RÈGLE ABSOLUE N°2: tu termines TOUJOURS par ---HASHTAGS--- suivi des hashtags. RÈGLE ABSOLUE N°3: l'article doit être complet entre 600 et 800 caractères.`,
-    },
-    {
-      role: 'user',
-      content: `Écris un post publicitaire COMPLET en ${language} pour: "${keyword}"
-${servicesHint ? `Services (choisis 2-3): ${servicesHint}` : ''}
-Ton: ${tone}. 3 paragraphes complets. Appel à l'action final fort.
-${companyClosing ? `Infos entreprise: ${companyClosing}` : ''}
-
-FORMAT EXACT:
-[post complet en ${language}, 600-800 caractères]
----HASHTAGS---
-[8 à 10 hashtags sans #, séparés par espaces, liés au service et à la ville]`,
-    },
+    { role: 'system', content: `Tu es un rédacteur publicitaire expert. Tu écris UNIQUEMENT en ${language}. Pas d'intro. Directement le post. Termine par ---HASHTAGS--- suivi des hashtags. Article complet 600-800 caractères.` },
+    { role: 'user', content: `Post publicitaire en ${language} pour: "${keyword}"\n${servicesHint ? `Services (2-3): ${servicesHint}` : ''}\nTon: ${tone}. 3 paragraphes. Appel à l'action.\n${companyClosing ? `Infos: ${companyClosing}` : ''}\n\n[post 600-800 chars]\n---HASHTAGS---\n[8-10 hashtags sans #]` },
     { role: 'assistant', content: '🔧' },
   ], 0.85)
 
@@ -116,44 +100,28 @@ FORMAT EXACT:
   let postText = stripPreamble(parts[0].trim())
   const hashtagRaw = (parts[1] || '').trim()
   let hashtags = hashtagRaw.split(/[\s,\n]+/).map((h: string) => h.replace(/#/g, '').trim()).filter((h: string) => h.length > 2 && !/---/.test(h)).slice(0, 10)
-  if (hashtags.length < 8) {
-    const fallback = buildFallbackHashtags(keyword)
-    hashtags = [...new Set([...hashtags, ...fallback])].slice(0, 10)
-  }
-  const final = buildFinalPost(postText, hashtags)
-  console.log(`[Auto] Social: ${postText.length} chars + ${hashtags.length} hashtags`)
-  return final
+  if (hashtags.length < 8) hashtags = [...new Set([...hashtags, ...buildFallbackHashtags(keyword)])].slice(0, 10)
+  return buildFinalPost(postText, hashtags)
 }
 
-// Generate full SEO blog post for WordPress
-export async function generateWordPressArticle(keyword: string, language: string, company: CompanyInfo): Promise<string> {
-  console.log(`[WordPress] Generating SEO post for: ${keyword}`)
-  const wpPost = await generateWordPressPost(keyword, language, company)
+export async function generateWordPressArticle(keyword: string, language: string, company: CompanyInfo, siteUrl?: string, username?: string, appPassword?: string): Promise<string> {
+  console.log(`[WordPress] Generating SEO post: ${keyword}`)
+  const wpPost = await generateWordPressPost(keyword, language, company, siteUrl, username, appPassword)
   return JSON.stringify(wpPost)
 }
 
 async function getRandomPhoto(): Promise<string[]> {
-  // Try Cloudinary first
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME
   const apiKey = process.env.CLOUDINARY_API_KEY
   const apiSecret = process.env.CLOUDINARY_API_SECRET
-
   if (cloudName && apiKey && apiSecret) {
     try {
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/resources/image?max_results=50&type=upload`,
-        { headers: { 'Authorization': `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}` } }
-      )
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/resources/image?max_results=50&type=upload`, { headers: { 'Authorization': `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}` } })
       const data = await res.json()
       const images = data.resources || []
-      if (images.length) {
-        const random = images[Math.floor(Math.random() * images.length)]
-        return [random.secure_url]
-      }
-    } catch (err: any) { console.warn('[Photo] Cloudinary failed:', err.message) }
+      if (images.length) { const r = images[Math.floor(Math.random() * images.length)]; return [r.secure_url] }
+    } catch {}
   }
-
-  // Fallback to local
   try {
     const { readdir } = await import('fs/promises')
     const { existsSync } = await import('fs')
@@ -177,16 +145,14 @@ export async function processAutomation() {
   for (const schedule of schedules) {
     const dayTimes: Record<string, string[]> = JSON.parse(schedule.dayTimes || '{}')
     const timesForToday: string[] = dayTimes[currentDay] || []
-
     const matchingTime = timesForToday.find(t => {
       const [h, m] = t.split(':').map(Number)
       return Math.abs((h * 60 + m) - (now.getHours() * 60 + now.getMinutes())) <= 1
     })
     if (!matchingTime) continue
-
     if (schedule.lastRunAt) {
       const minsSince = (now.getTime() - new Date(schedule.lastRunAt).getTime()) / 60000
-      if (minsSince < 58) { console.log(`[Auto] Skipping — ran ${Math.round(minsSince)}min ago`); continue }
+      if (minsSince < 58) { console.log(`[Auto] Skipping — ${Math.round(minsSince)}min ago`); continue }
     }
 
     console.log(`[Auto] 🚀 "${schedule.name}"`)
@@ -195,10 +161,7 @@ export async function processAutomation() {
     const language = config.language || 'French'
     const tone = config.tone || 'professional'
     const postsPerSlot = schedule.postsPerSlot || 1
-    const company: CompanyInfo = {
-      name: schedule.companyName, phone: schedule.companyPhone,
-      address: schedule.companyAddress, website: schedule.companyWebsite,
-    }
+    const company: CompanyInfo = { name: schedule.companyName, phone: schedule.companyPhone, address: schedule.companyAddress, website: schedule.companyWebsite }
 
     for (let i = 0; i < postsPerSlot; i++) {
       try {
@@ -207,17 +170,28 @@ export async function processAutomation() {
         const successAccounts: string[] = []
         let lastError = ''
 
-        // Generate content per platform type
-        let socialContent: string | null = null
-        let wpContent: string | null = null
-
         const hasSocial = accounts.some(a => ['facebook', 'instagram', 'twitter', 'google_business'].includes(a.platform))
         const hasWordPress = accounts.some(a => a.platform === 'wordpress')
 
-        if (hasSocial) socialContent = await generateArticle(keyword, language, tone, company)
-        if (hasWordPress) wpContent = await generateWordPressArticle(keyword, language, company)
+        let socialContent: string | null = null
+        let wpContent: string | null = null
 
-        // Use social content for article storage
+        if (hasSocial) socialContent = await generateArticle(keyword, language, tone, company)
+
+        if (hasWordPress) {
+          // Pass WordPress credentials to generator for internal linking
+          const wpAccount = accounts.find(a => a.platform === 'wordpress')
+          if (wpAccount) {
+            const wpExtra = parseExtraData(wpAccount.extraData)
+            wpContent = await generateWordPressArticle(
+              keyword, language, company,
+              wpExtra?.siteUrl || wpAccount.pageId || undefined,
+              wpExtra?.username,
+              wpAccount.accessToken
+            )
+          }
+        }
+
         const articleContent = socialContent || keyword
         const article = await prisma.article.create({
           data: { title: `${keyword} — ${now.toLocaleDateString()} #${i + 1}`, content: articleContent, topic: keyword, language, published: true },
@@ -227,13 +201,7 @@ export async function processAutomation() {
           const isWordPress = account.platform === 'wordpress'
           const content = isWordPress ? (wpContent || articleContent) : (socialContent || articleContent)
           try {
-            await sendPost({
-              text: content, mediaUrls: photoUrls,
-              platform: account.platform, accessToken: account.accessToken,
-              pageId: account.pageId || undefined,
-              extraData: account.extraData ? account.extraData : undefined,
-              humanize: false,
-            })
+            await sendPost({ text: content, mediaUrls: photoUrls, platform: account.platform, accessToken: account.accessToken, pageId: account.pageId || undefined, extraData: account.extraData, humanize: false })
             successAccounts.push(account.username)
             console.log(`[Auto] ✅ ${account.username} (${account.platform})`)
           } catch (err: any) {
@@ -243,9 +211,7 @@ export async function processAutomation() {
           }
         }
 
-        await prisma.autoPost.create({
-          data: { scheduleId: schedule.id, articleId: article.id, accounts: JSON.stringify(successAccounts), success: successAccounts.length > 0, error: lastError || null },
-        })
+        await prisma.autoPost.create({ data: { scheduleId: schedule.id, articleId: article.id, accounts: JSON.stringify(successAccounts), success: successAccounts.length > 0, error: lastError || null } })
         processed++
         if (i < postsPerSlot - 1) await new Promise(r => setTimeout(r, 3000))
       } catch (err: any) {
