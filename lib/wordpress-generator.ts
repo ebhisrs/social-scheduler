@@ -17,40 +17,93 @@ interface CompanyInfo {
   website?: string | null
 }
 
-function getServiceDetails(keyword: string): { services: string; faq: string; localContext: string } {
+function getServiceDetails(keyword: string) {
   const k = keyword.toLowerCase()
-
   if (k.includes('vitrier') || k.includes('vitrage') || k.includes('vitre')) return {
-    services: 'remplacement de vitre, double vitrage, vitrage simple, bris de glace urgence, fenêtres PVC, baies vitrées, miroirs, velux',
-    faq: 'Combien coûte un remplacement de vitre ?|Intervenez-vous en urgence ?|Quelle différence entre simple et double vitrage ?|Combien de temps dure une intervention ?',
-    localContext: 'vitrier, vitrerie, miroiterie, pose de fenêtres',
+    services: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'isolation thermique', 'fenêtres alu'],
+    faqPool: [
+      'Combien coûte un remplacement de vitre ?',
+      'Intervenez-vous en urgence le week-end ?',
+      'Quelle différence entre simple et double vitrage ?',
+      'Combien de temps dure une intervention vitrier ?',
+      'Le double vitrage réduit-il vraiment les factures de chauffage ?',
+      'Pouvez-vous remplacer une vitre feuilletée ?',
+      'Quel délai pour un devis vitrage ?',
+      'Travaillez-vous avec les assurances pour bris de glace ?',
+    ],
+    localContext: 'vitrier, vitrerie, miroiterie, pose fenêtres',
   }
   if (k.includes('serrurier') || k.includes('serrure')) return {
-    services: 'ouverture de porte claquée, changement de serrure, serrure multipoints, blindage de porte, urgence 24h/7j, coffre-fort',
-    faq: 'Combien coûte une ouverture de porte ?|Intervenez-vous la nuit ?|Quels types de serrures posez-vous ?|Combien de temps pour ouvrir une porte ?',
-    localContext: 'serrurier, serrurerie, dépannage serrurerie, sécurité porte',
+    services: ['ouverture de porte claquée', 'changement de serrure', 'serrure multipoints', 'blindage de porte', 'urgence 24h/7j', 'coffre-fort', 'serrure connectée', 'cylindre haute sécurité'],
+    faqPool: [
+      'Combien coûte une ouverture de porte ?',
+      'Intervenez-vous la nuit et le week-end ?',
+      'Quelle serrure choisir pour une porte blindée ?',
+      'Combien de temps pour ouvrir une porte claquée ?',
+      'Peut-on ouvrir une porte sans l\'abîmer ?',
+      'Quelle différence entre serrure 3 et 5 points ?',
+      'Comment choisir un serrurier de confiance ?',
+      'Remplacez-vous aussi les cylindres ?',
+    ],
+    localContext: 'serrurier, serrurerie, dépannage serrurerie, sécurité',
   }
   if (k.includes('plombier') || k.includes('plomberie')) return {
-    services: 'fuite d\'eau urgence, débouchage canalisation, installation chauffe-eau, robinetterie, salle de bain, chauffage, climatisation',
-    faq: 'Combien coûte un plombier ?|Intervenez-vous en urgence ?|Réparez-vous les fuites d\'eau ?|Installez-vous des chauffe-eaux ?',
-    localContext: 'plombier, plomberie, dépannage plomberie, fuite eau',
+    services: ['fuite d\'eau urgence', 'débouchage canalisation', 'installation chauffe-eau', 'robinetterie', 'salle de bain', 'chauffage', 'remplacement chaudière', 'détartrage'],
+    faqPool: [
+      'Combien coûte un plombier en urgence ?',
+      'Comment détecter une fuite d\'eau cachée ?',
+      'Quel chauffe-eau choisir pour une famille ?',
+      'Combien de temps pour déboucher une canalisation ?',
+      'La fuite est couverte par mon assurance ?',
+      'Intervenez-vous pour les copropriétés ?',
+    ],
+    localContext: 'plombier, plomberie, dépannage, fuite eau',
   }
   if (k.includes('electricien') || k.includes('électricien')) return {
-    services: 'dépannage électrique, tableau électrique, mise aux normes, installation prises, éclairage LED, bornes de recharge voiture',
-    faq: 'Combien coûte un électricien ?|Faites-vous des mises aux normes ?|Intervenez-vous en urgence ?|Installez-vous des panneaux solaires ?',
-    localContext: 'électricien, électricité, dépannage électrique, installation électrique',
-  }
-  if (k.includes('peintre') || k.includes('peinture')) return {
-    services: 'peinture intérieure, peinture extérieure, ravalement de façade, papier peint, enduit, isolation thermique par l\'extérieur',
-    faq: 'Combien coûte un peintre ?|Combien de temps pour peindre une pièce ?|Fournissez-vous les matériaux ?|Faites-vous le ravalement de façade ?',
-    localContext: 'peintre, peinture, décoration intérieure, ravalement façade',
+    services: ['dépannage électrique', 'tableau électrique', 'mise aux normes', 'prises et interrupteurs', 'éclairage LED', 'borne recharge voiture', 'installation électrique complète'],
+    faqPool: [
+      'Combien coûte un électricien en urgence ?',
+      'Comment savoir si mon installation est aux normes ?',
+      'Faut-il un électricien pour installer une borne de recharge ?',
+      'Peut-on installer un tableau électrique soi-même ?',
+      'Combien coûte une mise aux normes électrique ?',
+    ],
+    localContext: 'électricien, électricité, dépannage électrique',
   }
   return {
-    services: 'services professionnels, devis gratuit, intervention rapide, garantie travaux',
-    faq: 'Quels sont vos tarifs ?|Intervenez-vous en urgence ?|Proposez-vous des devis gratuits ?|Quelle est votre zone d\'intervention ?',
-    localContext: 'artisan, professionnel, dépannage, travaux',
+    services: ['intervention rapide', 'devis gratuit', 'garantie travaux', 'artisan qualifié', 'service d\'urgence'],
+    faqPool: ['Quels sont vos tarifs ?', 'Proposez-vous des devis gratuits ?', 'Quelle est votre zone d\'intervention ?'],
+    localContext: 'artisan, professionnel, dépannage',
   }
 }
+
+// Random pick from array
+function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+function pickN<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, n)
+}
+
+// Different article angles/structures
+const ARTICLE_ANGLES = [
+  'guide_complet',      // Complete guide
+  'urgence_focus',      // Focus on emergency/urgency
+  'prix_tarifs',        // Price/cost focused
+  'comparatif',         // Comparison article
+  'conseils_pro',       // Professional tips
+  'pourquoi_choisir',   // Why choose us
+  'avant_apres',        // Before/after approach
+  'saison',             // Seasonal angle
+]
+
+const INTRO_HOOKS = [
+  'Vous cherchez un {service} de confiance à {city} ?',
+  'Une urgence {service} à {city} ? Voici ce que vous devez savoir.',
+  'Choisir le bon {service} à {city} peut faire toute la différence.',
+  'Votre {service} à {city} : tout ce qu\'il faut savoir avant d\'appeler.',
+  '{city} : notre équipe de {service} intervient rapidement.',
+  'Besoin d\'un {service} professionnel à {city} ? Lisez ceci avant tout.',
+]
 
 export async function generateWordPressPost(
   keyword: string,
@@ -58,127 +111,183 @@ export async function generateWordPressPost(
   company: CompanyInfo
 ): Promise<WordPressPost> {
 
-  const { services, faq, localContext } = getServiceDetails(keyword)
-  const faqItems = faq.split('|')
+  const { services, faqPool, localContext } = getServiceDetails(keyword)
+  const angle = pick(ARTICLE_ANGLES)
+  const selectedFaqs = pickN(faqPool, 4)
+  const selectedServices = pickN(services, Math.floor(Math.random() * 3) + 3) // 3-5 services
 
-  // Extract city from keyword if present
-  const cityMatch = keyword.match(/\b(à|a|en|near|in)\s+([A-ZÀ-Ü][a-zà-ü\-]+(?:\s+[A-ZÀ-Ü][a-zà-ü\-]+)*)/i)
-  const city = cityMatch ? cityMatch[2] : ''
+  const cityMatch = keyword.match(/\b(à|a|en|near|in|sur|chez)\s+([A-ZÀ-Ü][a-zà-ü\-]+(?:\s+[A-ZÀ-Ü][a-zà-ü\-]+)*)/i)
+  const city = cityMatch ? cityMatch[2] : 'votre ville'
+  const serviceName = keyword.split(' ')[0]
+
   const companyName = company.name || 'notre équipe'
   const companyPhone = company.phone || ''
   const companyAddress = company.address || city
   const companyWebsite = company.website || ''
 
+  const hook = pick(INTRO_HOOKS).replace('{service}', serviceName).replace('{city}', city)
+
+  // Different title formats based on angle
+  const titleFormats: Record<string, string[]> = {
+    guide_complet: [
+      `${keyword} : Guide Complet ${new Date().getFullYear()}`,
+      `Tout savoir sur le ${serviceName} à ${city}`,
+      `Guide complet : choisir son ${serviceName} à ${city}`,
+    ],
+    urgence_focus: [
+      `${keyword} urgence — Intervention rapide 24h/7j`,
+      `Urgence ${serviceName} à ${city} : qui appeler ?`,
+      `${serviceName} d'urgence à ${city} — On se déplace vite`,
+    ],
+    prix_tarifs: [
+      `Prix ${serviceName} à ${city} — Tarifs ${new Date().getFullYear()}`,
+      `Combien coûte un ${serviceName} à ${city} ?`,
+      `Tarifs ${keyword} : ce qu'il faut savoir`,
+    ],
+    comparatif: [
+      `Comment choisir son ${serviceName} à ${city} ?`,
+      `${serviceName} à ${city} : les critères pour bien choisir`,
+      `Quel ${serviceName} choisir à ${city} en ${new Date().getFullYear()} ?`,
+    ],
+    conseils_pro: [
+      `${keyword} : Conseils de professionnels`,
+      `Les conseils de votre ${serviceName} à ${city}`,
+      `${serviceName} à ${city} : ce que les pros ne vous disent pas`,
+    ],
+    pourquoi_choisir: [
+      `Pourquoi choisir ${companyName} pour votre ${serviceName} à ${city} ?`,
+      `${keyword} — Faites confiance aux experts locaux`,
+      `Votre ${serviceName} de confiance à ${city}`,
+    ],
+    avant_apres: [
+      `${keyword} : avant et après l'intervention`,
+      `Ce que change un bon ${serviceName} à ${city}`,
+      `${serviceName} à ${city} : résultats garantis`,
+    ],
+    saison: [
+      `${keyword} : nos conseils pour ${pick(['l\'hiver', 'l\'été', 'le printemps', 'l\'automne'])}`,
+      `Préparez votre ${serviceName} à ${city} avant la saison`,
+      `${serviceName} à ${city} — Interventions toute l'année`,
+    ],
+  }
+
+  const titleOptions = titleFormats[angle] || titleFormats.guide_complet
+  const titleBase = pick(titleOptions)
+
   const raw = await aiChat([
     {
       role: 'system',
-      content: `Tu es un expert SEO et rédacteur web professionnel. Tu écris UNIQUEMENT en ${language}. Tu crées des articles de blog ultra-optimisés pour le référencement local. Tu suis exactement le format demandé sans jamais ajouter d'introduction ou d'explication.`,
+      content: `Tu es un expert SEO et rédacteur web. Tu écris UNIQUEMENT en ${language}. Tu crées des articles de blog différents à chaque fois, avec des angles variés et du contenu unique. Tu ne répètes jamais le même article. Tu suis exactement le format demandé.`,
     },
     {
       role: 'user',
-      content: `Écris un article de blog SEO complet pour: "${keyword}"
+      content: `Écris un article de blog SEO UNIQUE pour: "${keyword}"
+      
+ANGLE DE L'ARTICLE: ${angle} — ${hook}
+TITRE SUGGÉRÉ: ${titleBase}
 
 ENTREPRISE:
 - Nom: ${companyName}
-- Téléphone: ${companyPhone}
+- Téléphone: ${companyPhone}  
 - Adresse: ${companyAddress}
-- Site: ${companyWebsite}
+${companyWebsite ? `- Site: ${companyWebsite}` : ''}
 
-SERVICES: ${services}
+SERVICES À METTRE EN AVANT (ces services spécifiques cette fois): ${selectedServices.join(', ')}
 
-FORMAT EXACT (respecte absolument cette structure):
+FAQ À TRAITER (ces questions spécifiques): 
+${selectedFaqs.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+IMPORTANT: L'article doit être DIFFÉRENT des articles génériques — utilise l'angle "${angle}" pour créer un contenu unique et engageant.
+
+FORMAT EXACT:
 
 ###TITLE###
-[Titre SEO accrocheur avec le mot-clé principal, max 60 caractères]
+${titleBase}
 
 ###METADESC###
-[Meta description 150-160 caractères avec mot-clé et appel à l'action]
+[Meta description 150-160 caractères unique avec le mot-clé et un appel à l'action]
 
 ###SLUG###
-[URL slug en minuscules avec tirets, ex: vitrier-chassieu-urgence]
+[slug-unique-avec-tirets-et-date-ou-angle]
 
 ###TAGS###
-[10-15 tags séparés par virgules]
+[12-15 tags variés séparés par virgules]
 
 ###CONTENT###
-[Article HTML complet avec cette structure EXACTE:]
+<h1>${titleBase}</h1>
 
-<h1>[Titre H1 avec mot-clé principal]</h1>
+<p>${hook} ${companyName} vous répond avec expertise et rapidité. Découvrez tout ce qu'il faut savoir.</p>
 
-<p>[Introduction 2-3 phrases: problème du lecteur + solution + mot-clé naturellement intégré]</p>
-
-<h2>[Titre H2: Nos services de {keyword}]</h2>
-<p>[Description détaillée des services: ${services}. 3-4 phrases.]</p>
-
+<h2>Nos services de ${serviceName} à ${city}</h2>
+<p>[Description engageante des services sélectionnés avec l'angle ${angle}. 3-4 phrases originales.]</p>
 <ul>
-${services.split(',').map(s => `<li><strong>${s.trim()}</strong>: description courte</li>`).join('\n')}
+${selectedServices.map(s => `<li><strong>${s}</strong> : [description spécifique et utile]</li>`).join('\n')}
 </ul>
 
-<h2>Pourquoi choisir ${companyName} pour votre ${keyword.split(' ')[0]} ?</h2>
-<p>[4-5 avantages concurrentiels: rapidité, prix, expertise, garantie, disponibilité]</p>
+<h2>[H2 unique basé sur l'angle ${angle}]</h2>
+<p>[Contenu original et utile, 3-4 phrases. Évite les formulations génériques.]</p>
 
-<h2>Zone d'intervention: ${city || 'votre région'} et alentours</h2>
-<p>[Paragraphe sur la zone géographique, villes voisines, disponibilité locale]</p>
+<h2>Zone d'intervention : ${city} et communes voisines</h2>
+<p>[Paragraphe sur la zone géographique avec noms de villes proches de ${city}]</p>
 
-<h2>Tarifs et devis ${keyword.split(' ')[0]}</h2>
-<p>[Informations sur les prix, transparence tarifaire, devis gratuit]</p>
+<h2>Questions fréquentes sur le ${serviceName} à ${city}</h2>
+${selectedFaqs.map(q => `<h3>${q}</h3>\n<p>[Réponse concrète, honnête et utile — 2-3 phrases]</p>`).join('\n\n')}
 
-<h2>Questions fréquentes (FAQ)</h2>
-${faqItems.map(q => `<h3>${q}</h3>\n<p>[Réponse détaillée 2-3 phrases]</p>`).join('\n\n')}
-
-<h2>Contactez votre ${keyword.split(' ')[0]} à ${city || 'proximité'}</h2>
-<p>[CTA fort: coordonnées complètes, urgence, disponibilité 24h/7j si applicable]</p>
-<p><strong>📞 ${companyPhone}</strong><br>
-📍 ${companyAddress}<br>
-${companyWebsite ? `🌐 <a href="${companyWebsite}">${companyWebsite}</a>` : ''}</p>
+<h2>Contactez ${companyName} — ${serviceName} à ${city}</h2>
+<p>[CTA personnalisé avec l'angle ${angle}. Coordonnées complètes.]</p>
+<p>📞 <strong>${companyPhone}</strong><br>
+📍 ${companyAddress}${companyWebsite ? `<br>🌐 <a href="${companyWebsite}">${companyWebsite}</a>` : ''}</p>
 
 ###END###`,
     },
     { role: 'assistant', content: '###TITLE###' },
-  ], 0.7)
+  ], 0.9) // Higher temperature for more variety
 
   const fullRaw = '###TITLE###' + raw
 
-  // Parse sections
   const extract = (tag: string, nextTag: string) => {
     const regex = new RegExp(`###${tag}###\\s*([\\s\\S]*?)\\s*###${nextTag}###`)
     const match = fullRaw.match(regex)
     return match ? match[1].trim() : ''
   }
 
-  const title = extract('TITLE', 'METADESC')
+  const title = extract('TITLE', 'METADESC') || titleBase
   const metaDescription = extract('METADESC', 'SLUG')
-  const slug = extract('SLUG', 'TAGS').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-')
+  const slugRaw = extract('SLUG', 'TAGS')
+  const slug = slugRaw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').substring(0, 80)
   const tagsRaw = extract('TAGS', 'CONTENT')
-  const content = extract('CONTENT', 'END')
+  let content = extract('CONTENT', 'END')
 
-  const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
-
-  // Add schema markup for local business
+  // Add schema markup
   const schemaMarkup = `
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   "name": "${companyName}",
-  "description": "${metaDescription}",
+  "description": "${metaDescription.replace(/"/g, '\\"')}",
   ${companyPhone ? `"telephone": "${companyPhone}",` : ''}
   ${companyAddress ? `"address": {"@type": "PostalAddress", "streetAddress": "${companyAddress}"},` : ''}
   ${companyWebsite ? `"url": "${companyWebsite}",` : ''}
   "priceRange": "$$",
-  "openingHours": "Mo-Su 00:00-24:00"
+  "openingHours": "Mo-Su 00:00-24:00",
+  "areaServed": "${city}"
 }
 </script>`
 
-  const finalContent = content + '\n\n' + schemaMarkup
+  content = content + '\n\n' + schemaMarkup
+
+  const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
+
+  console.log(`[WordPress] Generated: angle=${angle} | title=${title} | content=${content.length} chars`)
 
   return {
-    title: title || `${keyword} — ${companyName}`,
-    content: finalContent,
-    metaDescription: metaDescription || `${companyName} - ${keyword}. Intervention rapide, devis gratuit. Appelez-nous!`,
-    slug: slug || keyword.toLowerCase().replace(/\s+/g, '-'),
+    title,
+    content,
+    metaDescription: metaDescription || `${companyName} - ${keyword}. ${pick(['Intervention rapide', 'Devis gratuit', 'Urgence 24h/7j'])}. Appelez-nous !`,
+    slug: slug || `${serviceName}-${city}-${Date.now()}`.toLowerCase().replace(/\s+/g, '-'),
     focusKeyword: keyword,
     tags,
-    categories: [keyword.split(' ')[0], localContext.split(',')[0].trim()],
+    categories: [serviceName, localContext.split(',')[0].trim()],
   }
 }
