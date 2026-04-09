@@ -82,16 +82,31 @@ function buildFallbackHashtags(keyword: string): string[] {
 
 export async function generateArticle(keyword: string, language: string, tone: string, company: CompanyInfo): Promise<string> {
   const servicesHint = getServicesHint(keyword)
+
+  // Build company info — only include fields that are actually filled
   const companyLines: string[] = []
   if (company.name)    companyLines.push(company.name)
   if (company.phone)   companyLines.push(`📞 ${company.phone}`)
   if (company.address) companyLines.push(`📍 ${company.address}`)
   if (company.website) companyLines.push(`🌐 ${company.website}`)
   const companyClosing = companyLines.join(' | ')
+  const hasCompany = companyLines.length > 0
 
   const raw = await aiChat([
-    { role: 'system', content: `Tu es un rédacteur publicitaire expert. Tu écris UNIQUEMENT en ${language}. Pas d'intro. Directement le post. Termine par ---HASHTAGS--- suivi des hashtags. Article complet 600-800 caractères.` },
-    { role: 'user', content: `Post publicitaire en ${language} pour: "${keyword}"\n${servicesHint ? `Services (2-3): ${servicesHint}` : ''}\nTon: ${tone}. 3 paragraphes. Appel à l'action.\n${companyClosing ? `Infos: ${companyClosing}` : ''}\n\n[post 600-800 chars]\n---HASHTAGS---\n[8-10 hashtags sans #]` },
+    {
+      role: 'system',
+      content: `Tu es un rédacteur publicitaire expert. Tu écris UNIQUEMENT en ${language}. Pas d'intro. Directement le post. Termine par ---HASHTAGS--- suivi des hashtags. Article complet 600-800 caractères.${!hasCompany ? " Ne mentionne AUCUNE information d'entreprise, téléphone, adresse ou site web." : ''}`,
+    },
+    {
+      role: 'user',
+      content: `Post publicitaire en ${language} pour: "${keyword}"
+${servicesHint ? `Services (2-3): ${servicesHint}` : ''}
+Ton: ${tone}. 3 paragraphes. Appel à l'action.${hasCompany ? `\nInfos entreprise à inclure à la fin: ${companyClosing}` : '\nNe pas mentionner d\'informations d\'entreprise.'}
+
+[post 600-800 chars]
+---HASHTAGS---
+[8-10 hashtags sans #]`,
+    },
     { role: 'assistant', content: '🔧' },
   ], 0.85)
 
@@ -161,7 +176,12 @@ export async function processAutomation() {
     const language = config.language || 'French'
     const tone = config.tone || 'professional'
     const postsPerSlot = schedule.postsPerSlot || 1
-    const company: CompanyInfo = { name: schedule.companyName, phone: schedule.companyPhone, address: schedule.companyAddress, website: schedule.companyWebsite }
+    const company: CompanyInfo = {
+      name: schedule.companyName,
+      phone: schedule.companyPhone,
+      address: schedule.companyAddress,
+      website: schedule.companyWebsite,
+    }
 
     for (let i = 0; i < postsPerSlot; i++) {
       try {
@@ -179,7 +199,6 @@ export async function processAutomation() {
         if (hasSocial) socialContent = await generateArticle(keyword, language, tone, company)
 
         if (hasWordPress) {
-          // Pass WordPress credentials to generator for internal linking
           const wpAccount = accounts.find(a => a.platform === 'wordpress')
           if (wpAccount) {
             const wpExtra = parseExtraData(wpAccount.extraData)
@@ -201,7 +220,13 @@ export async function processAutomation() {
           const isWordPress = account.platform === 'wordpress'
           const content = isWordPress ? (wpContent || articleContent) : (socialContent || articleContent)
           try {
-            await sendPost({ text: content, mediaUrls: photoUrls, platform: account.platform, accessToken: account.accessToken, pageId: account.pageId || undefined, extraData: account.extraData, humanize: false })
+            await sendPost({
+              text: content, mediaUrls: photoUrls,
+              platform: account.platform, accessToken: account.accessToken,
+              pageId: account.pageId || undefined,
+              extraData: account.extraData,
+              humanize: false,
+            })
             successAccounts.push(account.username)
             console.log(`[Auto] ✅ ${account.username} (${account.platform})`)
           } catch (err: any) {
@@ -211,7 +236,9 @@ export async function processAutomation() {
           }
         }
 
-        await prisma.autoPost.create({ data: { scheduleId: schedule.id, articleId: article.id, accounts: JSON.stringify(successAccounts), success: successAccounts.length > 0, error: lastError || null } })
+        await prisma.autoPost.create({
+          data: { scheduleId: schedule.id, articleId: article.id, accounts: JSON.stringify(successAccounts), success: successAccounts.length > 0, error: lastError || null },
+        })
         processed++
         if (i < postsPerSlot - 1) await new Promise(r => setTimeout(r, 3000))
       } catch (err: any) {
