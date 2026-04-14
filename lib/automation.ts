@@ -58,32 +58,119 @@ interface CompanyInfo {
   name?: string | null; phone?: string | null; address?: string | null; website?: string | null
 }
 
-function getServicesHint(keyword: string): string {
-  const k = keyword.toLowerCase()
-  if (k.includes('vitrier') || k.includes('vitre')) return 'remplacement de vitre, double vitrage, bris de glace urgence, fenêtres, baies vitrées'
-  if (k.includes('serrurier')) return "ouverture de porte claquée, changement de serrure, urgence 24h/7j, blindage de porte"
-  if (k.includes('plombier')) return "fuite d'eau urgence, débouchage canalisation, chauffe-eau, robinetterie"
-  if (k.includes('electricien') || k.includes('électricien')) return 'dépannage électrique, tableau électrique, mise aux normes'
-  if (k.includes('peintre')) return 'peinture intérieure, peinture extérieure, ravalement de façade'
-  return ''
+// All possible services per trade
+const SERVICES_MAP: Record<string, string[]> = {
+  vitrier: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'fenêtres aluminium', 'isolation thermique'],
+  serrurier: ['ouverture de porte claquée', 'changement de serrure', 'serrure multipoints', 'blindage de porte', 'urgence 24h/7j', 'cylindre haute sécurité', 'serrure connectée', 'coffre-fort'],
+  plombier: ['fuite eau urgence', 'débouchage canalisation', 'chauffe-eau', 'robinetterie', 'salle de bain', 'chauffage', 'remplacement chaudière'],
+  electricien: ['dépannage électrique', 'tableau électrique', 'mise aux normes', 'prises', 'éclairage LED', 'borne recharge'],
+  peintre: ['peinture intérieure', 'peinture extérieure', 'ravalement façade', 'papier peint', 'enduit'],
 }
 
-function buildFallbackHashtags(keyword: string): string[] {
-  const words = keyword.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter((w: string) => w.length > 2)
-  const tags = [...words]
+// Opening hooks — 20 different ones
+const HOOKS = [
+  '🔧 Une urgence ? Notre équipe',
+  '🔧 Vous cherchez un professionnel fiable ?',
+  '🔧 Besoin d\'une intervention rapide ?',
+  '🔧 Votre expert local est là !',
+  '🔧 Intervention garantie en moins d\'une heure.',
+  '🔧 Devis gratuit et sans engagement.',
+  '🔧 Artisan certifié, prix transparents.',
+  '🔧 Disponible 7j/7, même le week-end.',
+  '🔧 Des professionnels à votre service.',
+  '🔧 Qualité artisanale, tarifs compétitifs.',
+  '🔧 Votre sécurité est notre priorité.',
+  '🔧 Nous intervenons partout dans la région.',
+  '🔧 Un savoir-faire reconnu depuis des années.',
+  '🔧 Satisfaction client garantie à 100%.',
+  '🔧 Problème urgent ? On arrive vite !',
+  '🔧 Faites confiance aux vrais professionnels.',
+  '🔧 Nos experts sont prêts à intervenir.',
+  '🔧 Résultats rapides et travail soigné.',
+  '🔧 Le bon artisan au bon moment.',
+  '🔧 Appelez-nous, on s\'occupe de tout.',
+]
+
+// Different CTA endings
+const CTAS = [
+  'Appelez-nous maintenant pour un devis gratuit !',
+  'Contactez-nous dès aujourd\'hui — intervention rapide !',
+  'Devis gratuit en quelques minutes. Appelez !',
+  'Ne tardez pas, contactez-nous maintenant !',
+  'Réservez votre intervention dès maintenant !',
+  'Un coup de fil suffit — on s\'en occupe !',
+  'Contactez-nous pour une intervention sans délai.',
+  'Disponible maintenant — appelez-nous !',
+]
+
+function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+function pickN<T>(arr: T[], n: number): T[] { return [...arr].sort(() => Math.random() - 0.5).slice(0, n) }
+
+function getTradeKey(keyword: string): string {
   const k = keyword.toLowerCase()
-  if (k.includes('vitrier') || k.includes('vitre')) tags.push('vitrage', 'doublevitrage', 'brisdeglace', 'vitrerie')
-  if (k.includes('serrurier')) tags.push('serrurerie', 'ouverturedeporte', 'urgence', 'serrure')
-  if (k.includes('plombier')) tags.push('plomberie', 'fuitedeau', 'debouchage', 'urgence')
-  if (k.includes('electr')) tags.push('electricite', 'depannageelectrique', 'electricien')
-  tags.push('artisan', 'devisgratuit')
+  if (k.includes('vitrier') || k.includes('vitre') || k.includes('vitrage')) return 'vitrier'
+  if (k.includes('serrurier') || k.includes('serrure')) return 'serrurier'
+  if (k.includes('plombier') || k.includes('plomberie')) return 'plombier'
+  if (k.includes('electricien') || k.includes('électricien')) return 'electricien'
+  if (k.includes('peintre') || k.includes('peinture')) return 'peintre'
+  return 'artisan'
+}
+
+function buildHashtags(keyword: string, services: string[]): string[] {
+  const city = keyword.match(/\b(à|a|sur|en)\s+([A-ZÀ-Ü][a-zà-ü\-]+)/i)?.[2] || ''
+  const tradeKey = getTradeKey(keyword)
+  const tradeName = keyword.split(' ')[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+  const tags: string[] = [
+    tradeName,
+    ...(city ? [city.toLowerCase(), `${tradeName}${city.toLowerCase()}`, `${tradeName}urgence`] : [`${tradeName}urgence`]),
+    ...services.map(s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')).slice(0, 4),
+    'devisgratuit', 'artisanlocal', 'interventionrapide', 'professionnel',
+  ]
+
+  // Add trade-specific hashtags
+  if (tradeKey === 'vitrier') tags.push('vitrage', 'brisdeglace', 'doublevitrage')
+  if (tradeKey === 'serrurier') tags.push('serrurerie', 'ouverturedeporte', 'urgenceserrurerie')
+  if (tradeKey === 'plombier') tags.push('plomberie', 'fuitedeau', 'depannageplomberie')
+  if (tradeKey === 'electricien') tags.push('electricite', 'depannageelectrique')
+  if (tradeKey === 'peintre') tags.push('peinture', 'renovation', 'ravalement')
+
   return [...new Set(tags)].slice(0, 10)
 }
 
-export async function generateArticle(keyword: string, language: string, tone: string, company: CompanyInfo): Promise<string> {
-  const servicesHint = getServicesHint(keyword)
+// Get last articles to avoid repetition
+async function getLastContents(scheduleId: string, n = 5): Promise<string[]> {
+  try {
+    const posts = await prisma.autoPost.findMany({
+      where: { scheduleId },
+      orderBy: { sentAt: 'desc' },
+      take: n,
+      include: { article: { select: { content: true } } },
+    })
+    return posts.map(p => p.article?.content?.substring(0, 150) || '').filter(Boolean)
+  } catch { return [] }
+}
 
-  // Build company info — only include fields that are actually filled
+export async function generateArticle(
+  keyword: string,
+  language: string,
+  tone: string,
+  company: CompanyInfo,
+  scheduleId?: string
+): Promise<string> {
+  const tradeKey = getTradeKey(keyword)
+  const allServices = SERVICES_MAP[tradeKey] || ['intervention rapide', 'devis gratuit', 'artisan qualifié']
+
+  // Pick 2-3 RANDOM services — different each time
+  const selectedServices = pickN(allServices, Math.floor(Math.random() * 2) + 2)
+
+  // Pick random hook and CTA
+  const hook = pick(HOOKS)
+  const cta = pick(CTAS)
+
+  // Build hashtags from selected services
+  const hashtags = buildHashtags(keyword, selectedServices)
+
   const companyLines: string[] = []
   if (company.name)    companyLines.push(company.name)
   if (company.phone)   companyLines.push(`📞 ${company.phone}`)
@@ -92,34 +179,63 @@ export async function generateArticle(keyword: string, language: string, tone: s
   const companyClosing = companyLines.join(' | ')
   const hasCompany = companyLines.length > 0
 
+  // Get last articles to avoid repetition
+  const lastContents = scheduleId ? await getLastContents(scheduleId) : []
+  const avoidText = lastContents.length > 0
+    ? `\nNE PAS répéter ces formulations déjà utilisées:\n${lastContents.map((c, i) => `${i + 1}. "${c.substring(0, 80)}..."`).join('\n')}`
+    : ''
+
+  // Unique seed to force variation
+  const seed = `[SEED:${Date.now()}-${Math.random().toString(36).substring(7)}]`
+
   const raw = await aiChat([
     {
       role: 'system',
-      content: `Tu es un rédacteur publicitaire expert. Tu écris UNIQUEMENT en ${language}. Pas d'intro. Directement le post. Termine par ---HASHTAGS--- suivi des hashtags. Article complet 600-800 caractères.${!hasCompany ? " Ne mentionne AUCUNE information d'entreprise, téléphone, adresse ou site web." : ''}`,
+      content: `Tu es un rédacteur publicitaire créatif. Tu écris UNIQUEMENT en ${language}. RÈGLE ABSOLUE: chaque article doit être 100% unique et différent. Tu varies le style, la structure, les formulations à chaque fois. Pas d'intro. Directement le contenu. Termine par ---HASHTAGS--- suivi des hashtags.${!hasCompany ? " Ne mentionne AUCUNE information d'entreprise." : ''}`,
     },
     {
       role: 'user',
-      content: `Post publicitaire en ${language} pour: "${keyword}"
-${servicesHint ? `Services (2-3): ${servicesHint}` : ''}
-Ton: ${tone}. 3 paragraphes. Appel à l'action.${hasCompany ? `\nInfos entreprise à inclure à la fin: ${companyClosing}` : '\nNe pas mentionner d\'informations d\'entreprise.'}
+      content: `${seed}
+Écris un post publicitaire UNIQUE en ${language} pour: "${keyword}"
+Commence avec cette accroche (adapte-la): "${hook}"
+Services à mettre en avant CETTE FOIS: ${selectedServices.join(', ')}
+Termine avec: "${cta}"${hasCompany ? `\nInfos entreprise: ${companyClosing}` : ''}
+Ton: ${tone}. 3 paragraphes. 600-800 caractères.${avoidText}
 
 [post 600-800 chars]
 ---HASHTAGS---
-[8-10 hashtags sans #]`,
+${hashtags.join(' ')}`,
     },
     { role: 'assistant', content: '🔧' },
-  ], 0.85)
+  ], 0.95)
 
   const full = '🔧' + raw
   const parts = full.split('---HASHTAGS---')
   let postText = stripPreamble(parts[0].trim())
-  const hashtagRaw = (parts[1] || '').trim()
-  let hashtags = hashtagRaw.split(/[\s,\n]+/).map((h: string) => h.replace(/#/g, '').trim()).filter((h: string) => h.length > 2 && !/---/.test(h)).slice(0, 10)
-  if (hashtags.length < 8) hashtags = [...new Set([...hashtags, ...buildFallbackHashtags(keyword)])].slice(0, 10)
-  return buildFinalPost(postText, hashtags)
+
+  // Use our pre-built hashtags + any the AI added
+  const aiHashtags = (parts[1] || '').trim()
+    .split(/[\s,\n]+/)
+    .map((h: string) => h.replace(/#/g, '').trim())
+    .filter((h: string) => h.length > 2 && !/---/.test(h) && !/^\d+$/.test(h))
+    .slice(0, 5)
+
+  // Merge AI hashtags with our guaranteed ones
+  const finalHashtags = [...new Set([...hashtags, ...aiHashtags])].slice(0, 10)
+
+  const final = buildFinalPost(postText, finalHashtags)
+  console.log(`[Auto] hook="${hook.substring(0, 30)}" | services=[${selectedServices.join(',')}] | ${postText.length} chars | ${finalHashtags.length} hashtags`)
+  return final
 }
 
-export async function generateWordPressArticle(keyword: string, language: string, company: CompanyInfo, siteUrl?: string, username?: string, appPassword?: string): Promise<string> {
+export async function generateWordPressArticle(
+  keyword: string,
+  language: string,
+  company: CompanyInfo,
+  siteUrl?: string,
+  username?: string,
+  appPassword?: string
+): Promise<string> {
   console.log(`[WordPress] Generating SEO post: ${keyword}`)
   const wpPost = await generateWordPressPost(keyword, language, company, siteUrl, username, appPassword)
   return JSON.stringify(wpPost)
@@ -131,10 +247,16 @@ async function getRandomPhoto(): Promise<string[]> {
   const apiSecret = process.env.CLOUDINARY_API_SECRET
   if (cloudName && apiKey && apiSecret) {
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/resources/image?max_results=50&type=upload`, { headers: { 'Authorization': `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}` } })
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/resources/image?max_results=50&type=upload`,
+        { headers: { 'Authorization': `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}` } }
+      )
       const data = await res.json()
       const images = data.resources || []
-      if (images.length) { const r = images[Math.floor(Math.random() * images.length)]; return [r.secure_url] }
+      if (images.length) {
+        const r = images[Math.floor(Math.random() * images.length)]
+        return [r.secure_url]
+      }
     } catch {}
   }
   try {
@@ -177,10 +299,8 @@ export async function processAutomation() {
     const tone = config.tone || 'professional'
     const postsPerSlot = schedule.postsPerSlot || 1
     const company: CompanyInfo = {
-      name: schedule.companyName,
-      phone: schedule.companyPhone,
-      address: schedule.companyAddress,
-      website: schedule.companyWebsite,
+      name: schedule.companyName, phone: schedule.companyPhone,
+      address: schedule.companyAddress, website: schedule.companyWebsite,
     }
 
     for (let i = 0; i < postsPerSlot; i++) {
@@ -196,7 +316,7 @@ export async function processAutomation() {
         let socialContent: string | null = null
         let wpContent: string | null = null
 
-        if (hasSocial) socialContent = await generateArticle(keyword, language, tone, company)
+        if (hasSocial) socialContent = await generateArticle(keyword, language, tone, company, schedule.id)
 
         if (hasWordPress) {
           const wpAccount = accounts.find(a => a.platform === 'wordpress')
