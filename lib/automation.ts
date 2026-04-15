@@ -24,10 +24,10 @@ function stripPreamble(text: string): string {
   const lines = text.split('\n')
   const skip = [
     /^(okay|ok|sure|certainly|absolutely|bien sûr|parfait|d'accord|voici|voilà|here|absolument)/i,
-    /^(je vous propose|here is|here's|let me|post publicitaire)/i,
+    /^(je vous propose|here is|here's|let me|post publicitaire|voici un post|voici le post)/i,
   ]
   let start = 0
-  for (let i = 0; i < Math.min(lines.length, 3); i++) {
+  for (let i = 0; i < Math.min(lines.length, 4); i++) {
     const line = lines[i].trim()
     if (!line) { start = i + 1; continue }
     if (skip.some(p => p.test(line))) { start = i + 1 } else break
@@ -58,49 +58,46 @@ interface CompanyInfo {
   name?: string | null; phone?: string | null; address?: string | null; website?: string | null
 }
 
-// All possible services per trade
 const SERVICES_MAP: Record<string, string[]> = {
-  vitrier: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'fenêtres aluminium', 'isolation thermique'],
-  serrurier: ['ouverture de porte claquée', 'changement de serrure', 'serrure multipoints', 'blindage de porte', 'urgence 24h/7j', 'cylindre haute sécurité', 'serrure connectée', 'coffre-fort'],
-  plombier: ['fuite eau urgence', 'débouchage canalisation', 'chauffe-eau', 'robinetterie', 'salle de bain', 'chauffage', 'remplacement chaudière'],
-  electricien: ['dépannage électrique', 'tableau électrique', 'mise aux normes', 'prises', 'éclairage LED', 'borne recharge'],
-  peintre: ['peinture intérieure', 'peinture extérieure', 'ravalement façade', 'papier peint', 'enduit'],
+  vitrier: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'fenêtres aluminium', 'isolation thermique vitrage'],
+  serrurier: ['ouverture de porte claquée', 'changement de serrure', 'serrure multipoints', 'blindage de porte', 'urgence 24h/7j', 'cylindre haute sécurité', 'serrure connectée', 'coffre-fort', 'protège-cylindre'],
+  plombier: ['fuite eau urgence', 'débouchage canalisation', 'chauffe-eau', 'robinetterie', 'rénovation salle de bain', 'chauffage central', 'remplacement chaudière', 'détartrage'],
+  electricien: ['dépannage électrique urgence', 'remplacement tableau électrique', 'mise aux normes', 'installation prises', 'éclairage LED', 'borne recharge voiture électrique'],
+  peintre: ['peinture intérieure', 'peinture extérieure', 'ravalement de façade', 'pose papier peint', 'enduit de finition', 'rénovation complète'],
 }
 
-// Opening hooks — 20 different ones
-const HOOKS = [
-  '🔧 Une urgence ? Notre équipe',
-  '🔧 Vous cherchez un professionnel fiable ?',
-  '🔧 Besoin d\'une intervention rapide ?',
-  '🔧 Votre expert local est là !',
-  '🔧 Intervention garantie en moins d\'une heure.',
-  '🔧 Devis gratuit et sans engagement.',
-  '🔧 Artisan certifié, prix transparents.',
-  '🔧 Disponible 7j/7, même le week-end.',
-  '🔧 Des professionnels à votre service.',
-  '🔧 Qualité artisanale, tarifs compétitifs.',
-  '🔧 Votre sécurité est notre priorité.',
-  '🔧 Nous intervenons partout dans la région.',
-  '🔧 Un savoir-faire reconnu depuis des années.',
-  '🔧 Satisfaction client garantie à 100%.',
-  '🔧 Problème urgent ? On arrive vite !',
-  '🔧 Faites confiance aux vrais professionnels.',
-  '🔧 Nos experts sont prêts à intervenir.',
-  '🔧 Résultats rapides et travail soigné.',
-  '🔧 Le bon artisan au bon moment.',
-  '🔧 Appelez-nous, on s\'occupe de tout.',
-]
-
-// Different CTA endings
-const CTAS = [
-  'Appelez-nous maintenant pour un devis gratuit !',
-  'Contactez-nous dès aujourd\'hui — intervention rapide !',
-  'Devis gratuit en quelques minutes. Appelez !',
-  'Ne tardez pas, contactez-nous maintenant !',
-  'Réservez votre intervention dès maintenant !',
-  'Un coup de fil suffit — on s\'en occupe !',
-  'Contactez-nous pour une intervention sans délai.',
-  'Disponible maintenant — appelez-nous !',
+// 30 completely different opening sentences — rotated to avoid repetition
+const OPENINGS = [
+  'Votre {service} de confiance à {city} intervient rapidement pour tous vos besoins.',
+  'Besoin d\'un {service} professionnel à {city} ? Nous sommes là pour vous.',
+  'À {city}, notre équipe de {service} est disponible 7j/7 pour vous aider.',
+  'Un problème urgent ? Votre {service} à {city} répond présent, même la nuit.',
+  'Depuis des années, nous sommes le {service} de référence à {city}.',
+  'Ne cherchez plus : le meilleur {service} à {city}, c\'est nous.',
+  'Intervention rapide et soignée — votre {service} à {city} est à votre service.',
+  'Qualité, rapidité, prix justes : votre {service} à {city} tient ses promesses.',
+  'Artisans locaux de {city}, nous sommes votre {service} de proximité.',
+  'Urgence ou travaux planifiés, votre {service} à {city} s\'adapte à vos besoins.',
+  'Faites confiance à des experts : {service} professionnel à {city}.',
+  'À {city} et alentours, notre équipe de {service} est prête à intervenir.',
+  'Vous méritez le meilleur : choisissez notre service de {service} à {city}.',
+  'Problème résolu rapidement grâce à votre {service} local à {city}.',
+  'Notre équipe de {service} à {city} met son expertise à votre service.',
+  'Devis gratuit, intervention rapide : c\'est la promesse de votre {service} à {city}.',
+  'À {city}, nous sommes l\'équipe de {service} qui intervient sans tarder.',
+  'Votre tranquillité d\'esprit commence ici : {service} professionnel à {city}.',
+  'Un {service} de confiance à {city} — disponible maintenant pour vous aider.',
+  'Nos techniciens {service} à {city} sont formés pour toutes les situations.',
+  'Choisissez la sécurité et la fiabilité : {service} certifié à {city}.',
+  'À votre écoute depuis toujours, votre {service} à {city} fait la différence.',
+  'Tarifs transparents, travail impeccable : votre {service} à {city} s\'engage.',
+  'Nous intervenons vite et bien : {service} d\'urgence à {city}.',
+  'La solution à vos problèmes : un {service} compétent à {city} disponible maintenant.',
+  'Votre {service} à {city} agit vite, travaille bien et respecte votre budget.',
+  'Faites appel aux meilleurs : {service} agréé à {city} à votre disposition.',
+  'Plus besoin de chercher : votre {service} de confiance à {city} est là.',
+  'Experts locaux à {city}, nous intervenons pour tous vos besoins en {service}.',
+  'Rapide, fiable et professionnel : c\'est votre {service} à {city}.',
 ]
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
@@ -117,28 +114,26 @@ function getTradeKey(keyword: string): string {
 }
 
 function buildHashtags(keyword: string, services: string[]): string[] {
-  const city = keyword.match(/\b(à|a|sur|en)\s+([A-ZÀ-Ü][a-zà-ü\-]+)/i)?.[2] || ''
+  const city = keyword.match(/\b(à|a|sur|en|de)\s+([A-ZÀ-Ü][a-zà-ü\-]+(?:\s+[A-ZÀ-Ü][a-zà-ü\-]+)?)/i)?.[2] || ''
   const tradeKey = getTradeKey(keyword)
   const tradeName = keyword.split(' ')[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const cityClean = city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-  const tags: string[] = [
-    tradeName,
-    ...(city ? [city.toLowerCase(), `${tradeName}${city.toLowerCase()}`, `${tradeName}urgence`] : [`${tradeName}urgence`]),
-    ...services.map(s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')).slice(0, 4),
-    'devisgratuit', 'artisanlocal', 'interventionrapide', 'professionnel',
-  ]
+  const tags: string[] = [tradeName]
+  if (cityClean) tags.push(cityClean, `${tradeName}${cityClean}`)
+  tags.push(`${tradeName}urgence`, `${tradeName}professionnel`)
+  tags.push(...services.slice(0, 3).map(s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')).filter(s => s.length > 3))
+  tags.push('devisgratuit', 'artisanlocal', 'interventionrapide')
 
-  // Add trade-specific hashtags
   if (tradeKey === 'vitrier') tags.push('vitrage', 'brisdeglace', 'doublevitrage')
-  if (tradeKey === 'serrurier') tags.push('serrurerie', 'ouverturedeporte', 'urgenceserrurerie')
-  if (tradeKey === 'plombier') tags.push('plomberie', 'fuitedeau', 'depannageplomberie')
-  if (tradeKey === 'electricien') tags.push('electricite', 'depannageelectrique')
-  if (tradeKey === 'peintre') tags.push('peinture', 'renovation', 'ravalement')
+  else if (tradeKey === 'serrurier') tags.push('serrurerie', 'ouverturedeporte', 'urgenceserrurerie')
+  else if (tradeKey === 'plombier') tags.push('plomberie', 'fuitedeau', 'depannageplomberie')
+  else if (tradeKey === 'electricien') tags.push('electricite', 'depannageelectrique')
+  else if (tradeKey === 'peintre') tags.push('peinture', 'renovation', 'ravalement')
 
-  return [...new Set(tags)].slice(0, 10)
+  return [...new Set(tags)].filter(t => t.length > 2).slice(0, 10)
 }
 
-// Get last articles to avoid repetition
 async function getLastContents(scheduleId: string, n = 5): Promise<string[]> {
   try {
     const posts = await prisma.autoPost.findMany({
@@ -147,7 +142,7 @@ async function getLastContents(scheduleId: string, n = 5): Promise<string[]> {
       take: n,
       include: { article: { select: { content: true } } },
     })
-    return posts.map(p => p.article?.content?.substring(0, 150) || '').filter(Boolean)
+    return posts.map(p => p.article?.content?.substring(0, 120) || '').filter(Boolean)
   } catch { return [] }
 }
 
@@ -160,15 +155,9 @@ export async function generateArticle(
 ): Promise<string> {
   const tradeKey = getTradeKey(keyword)
   const allServices = SERVICES_MAP[tradeKey] || ['intervention rapide', 'devis gratuit', 'artisan qualifié']
-
-  // Pick 2-3 RANDOM services — different each time
   const selectedServices = pickN(allServices, Math.floor(Math.random() * 2) + 2)
 
-  // Pick random hook and CTA
-  const hook = pick(HOOKS)
-  const cta = pick(CTAS)
-
-  // Build hashtags from selected services
+  // Build hashtags in code — guaranteed every time
   const hashtags = buildHashtags(keyword, selectedServices)
 
   const companyLines: string[] = []
@@ -179,52 +168,54 @@ export async function generateArticle(
   const companyClosing = companyLines.join(' | ')
   const hasCompany = companyLines.length > 0
 
+  // Extract city and service name for opening
+  const city = keyword.match(/\b(à|a|sur|en)\s+([A-ZÀ-Ü][a-zà-ü\-]+)/i)?.[2] || ''
+  const serviceName = keyword.split(' ')[0]
+
+  // Pick a random opening and customize it
+  const openingTemplate = pick(OPENINGS)
+  const opening = openingTemplate
+    .replace(/{service}/g, serviceName)
+    .replace(/{city}/g, city || 'votre région')
+
   // Get last articles to avoid repetition
   const lastContents = scheduleId ? await getLastContents(scheduleId) : []
-  const avoidText = lastContents.length > 0
-    ? `\nNE PAS répéter ces formulations déjà utilisées:\n${lastContents.map((c, i) => `${i + 1}. "${c.substring(0, 80)}..."`).join('\n')}`
+  const avoidNote = lastContents.length > 0
+    ? `\nÉVITE ABSOLUMENT ces formulations déjà utilisées:\n${lastContents.map((c, i) => `- "${c.substring(0, 60)}"`).join('\n')}`
     : ''
 
-  // Unique seed to force variation
-  const seed = `[SEED:${Date.now()}-${Math.random().toString(36).substring(7)}]`
+  // Unique timestamp seed
+  const seed = Date.now().toString(36) + Math.random().toString(36).substring(2, 6)
 
   const raw = await aiChat([
     {
       role: 'system',
-      content: `Tu es un rédacteur publicitaire créatif. Tu écris UNIQUEMENT en ${language}. RÈGLE ABSOLUE: chaque article doit être 100% unique et différent. Tu varies le style, la structure, les formulations à chaque fois. Pas d'intro. Directement le contenu. Termine par ---HASHTAGS--- suivi des hashtags.${!hasCompany ? " Ne mentionne AUCUNE information d'entreprise." : ''}`,
+      content: `Tu es un rédacteur publicitaire créatif [${seed}]. Tu écris UNIQUEMENT en ${language}. Tu dois écrire directement le corps du post en continuant la phrase d'ouverture donnée. JAMAIS d'intro comme "Voici", "Here is", etc. Chaque article doit être complètement unique.${!hasCompany ? " Ne mentionne AUCUNE info d'entreprise." : ''}`,
     },
     {
       role: 'user',
-      content: `${seed}
-Écris un post publicitaire UNIQUE en ${language} pour: "${keyword}"
-Commence avec cette accroche (adapte-la): "${hook}"
-Services à mettre en avant CETTE FOIS: ${selectedServices.join(', ')}
-Termine avec: "${cta}"${hasCompany ? `\nInfos entreprise: ${companyClosing}` : ''}
-Ton: ${tone}. 3 paragraphes. 600-800 caractères.${avoidText}
+      content: `Continue ce post publicitaire en ${language} pour "${keyword}" en développant à partir de cette première phrase:
 
-[post 600-800 chars]
----HASHTAGS---
-${hashtags.join(' ')}`,
+"${opening}"
+
+Services à développer (ces services SPÉCIFIQUEMENT, pas d'autres): ${selectedServices.join(', ')}
+Ton: ${tone}. Ajoute 2 paragraphes supplémentaires après l'ouverture. Total: 600-800 caractères.${hasCompany ? `\nFinis avec: ${companyClosing}` : ''}
+Appel à l'action fort à la fin.${avoidNote}
+
+Réponds UNIQUEMENT avec le texte du post (sans hashtags, sans intro).`,
     },
-    { role: 'assistant', content: '🔧' },
   ], 0.95)
 
-  const full = '🔧' + raw
-  const parts = full.split('---HASHTAGS---')
-  let postText = stripPreamble(parts[0].trim())
+  // Clean up the response
+  let postText = stripPreamble(raw.trim())
 
-  // Use our pre-built hashtags + any the AI added
-  const aiHashtags = (parts[1] || '').trim()
-    .split(/[\s,\n]+/)
-    .map((h: string) => h.replace(/#/g, '').trim())
-    .filter((h: string) => h.length > 2 && !/---/.test(h) && !/^\d+$/.test(h))
-    .slice(0, 5)
+  // Make sure it starts with our opening if AI ignored it
+  if (!postText.startsWith(opening.substring(0, 20))) {
+    postText = `${opening}\n\n${postText}`
+  }
 
-  // Merge AI hashtags with our guaranteed ones
-  const finalHashtags = [...new Set([...hashtags, ...aiHashtags])].slice(0, 10)
-
-  const final = buildFinalPost(postText, finalHashtags)
-  console.log(`[Auto] hook="${hook.substring(0, 30)}" | services=[${selectedServices.join(',')}] | ${postText.length} chars | ${finalHashtags.length} hashtags`)
+  const final = buildFinalPost(postText, hashtags)
+  console.log(`[Auto] opening="${opening.substring(0, 50)}" | ${postText.length} chars | ${hashtags.length} hashtags`)
   return final
 }
 
@@ -236,7 +227,6 @@ export async function generateWordPressArticle(
   username?: string,
   appPassword?: string
 ): Promise<string> {
-  console.log(`[WordPress] Generating SEO post: ${keyword}`)
   const wpPost = await generateWordPressPost(keyword, language, company, siteUrl, username, appPassword)
   return JSON.stringify(wpPost)
 }
@@ -253,10 +243,7 @@ async function getRandomPhoto(): Promise<string[]> {
       )
       const data = await res.json()
       const images = data.resources || []
-      if (images.length) {
-        const r = images[Math.floor(Math.random() * images.length)]
-        return [r.secure_url]
-      }
+      if (images.length) { const r = images[Math.floor(Math.random() * images.length)]; return [r.secure_url] }
     } catch {}
   }
   try {
@@ -322,12 +309,7 @@ export async function processAutomation() {
           const wpAccount = accounts.find(a => a.platform === 'wordpress')
           if (wpAccount) {
             const wpExtra = parseExtraData(wpAccount.extraData)
-            wpContent = await generateWordPressArticle(
-              keyword, language, company,
-              wpExtra?.siteUrl || wpAccount.pageId || undefined,
-              wpExtra?.username,
-              wpAccount.accessToken
-            )
+            wpContent = await generateWordPressArticle(keyword, language, company, wpExtra?.siteUrl || wpAccount.pageId || undefined, wpExtra?.username, wpAccount.accessToken)
           }
         }
 
@@ -340,13 +322,7 @@ export async function processAutomation() {
           const isWordPress = account.platform === 'wordpress'
           const content = isWordPress ? (wpContent || articleContent) : (socialContent || articleContent)
           try {
-            await sendPost({
-              text: content, mediaUrls: photoUrls,
-              platform: account.platform, accessToken: account.accessToken,
-              pageId: account.pageId || undefined,
-              extraData: account.extraData,
-              humanize: false,
-            })
+            await sendPost({ text: content, mediaUrls: photoUrls, platform: account.platform, accessToken: account.accessToken, pageId: account.pageId || undefined, extraData: account.extraData, humanize: false })
             successAccounts.push(account.username)
             console.log(`[Auto] ✅ ${account.username} (${account.platform})`)
           } catch (err: any) {
@@ -356,9 +332,7 @@ export async function processAutomation() {
           }
         }
 
-        await prisma.autoPost.create({
-          data: { scheduleId: schedule.id, articleId: article.id, accounts: JSON.stringify(successAccounts), success: successAccounts.length > 0, error: lastError || null },
-        })
+        await prisma.autoPost.create({ data: { scheduleId: schedule.id, articleId: article.id, accounts: JSON.stringify(successAccounts), success: successAccounts.length > 0, error: lastError || null } })
         processed++
         if (i < postsPerSlot - 1) await new Promise(r => setTimeout(r, 3000))
       } catch (err: any) {
