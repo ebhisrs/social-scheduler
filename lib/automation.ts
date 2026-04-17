@@ -20,19 +20,20 @@ function buildFinalPost(postText: string, hashtags: string[]): string {
   return `${postText.trim()}\n\n${hashtags.map(h => `#${h}`).join(' ')}`
 }
 
-function stripPreamble(text: string): string {
+// Remove ANY internal thinking or meta-commentary the AI adds
+function cleanAIOutput(text: string): string {
+  // Remove lines that look like AI thinking/self-correction
   const lines = text.split('\n')
-  const skip = [
-    /^(okay|ok|sure|certainly|absolutely|bien sûr|parfait|d'accord|voici|voilà|here|absolument)/i,
-    /^(je vous propose|here is|here's|let me|post publicitaire|voici un post|voici le post)/i,
-  ]
-  let start = 0
-  for (let i = 0; i < Math.min(lines.length, 4); i++) {
-    const line = lines[i].trim()
-    if (!line) { start = i + 1; continue }
-    if (skip.some(p => p.test(line))) { start = i + 1 } else break
-  }
-  return lines.slice(start).join('\n').trim()
+  const cleaned = lines.filter(line => {
+    const l = line.trim()
+    if (!l) return true
+    // Remove lines with AI thinking patterns
+    if (/^(okay|ok|sure|voici|here|absolument|parfait|wait|let me|drafting|self.correction|correction:|note:|thought|rewrite|previous output|re-read|paragraph \d|hook\.|solution\.|cta\.)/i.test(l)) return false
+    if (/🪔|🔧-|eyes-on|{_}|\(Self-correction/i.test(l)) return false
+    if (/^(p1:|p2:|p3:|intro:|body:|closing:)/i.test(l)) return false
+    return true
+  })
+  return cleaned.join('\n').trim()
 }
 
 async function sendFailureEmail(email: string, accountName: string, error: string, keyword: string) {
@@ -58,50 +59,41 @@ interface CompanyInfo {
   name?: string | null; phone?: string | null; address?: string | null; website?: string | null
 }
 
-const SERVICES_MAP: Record<string, string[]> = {
-  vitrier: ['remplacement de vitre', 'double vitrage', 'vitrage simple', 'bris de glace urgence', 'fenêtres PVC', 'baies vitrées', 'miroirs sur mesure', 'velux', 'fenêtres aluminium', 'isolation thermique vitrage'],
-  serrurier: ['ouverture de porte claquée', 'changement de serrure', 'serrure multipoints', 'blindage de porte', 'urgence 24h/7j', 'cylindre haute sécurité', 'serrure connectée', 'coffre-fort', 'protège-cylindre'],
-  plombier: ['fuite eau urgence', 'débouchage canalisation', 'chauffe-eau', 'robinetterie', 'rénovation salle de bain', 'chauffage central', 'remplacement chaudière', 'détartrage'],
-  electricien: ['dépannage électrique urgence', 'remplacement tableau électrique', 'mise aux normes', 'installation prises', 'éclairage LED', 'borne recharge voiture électrique'],
-  peintre: ['peinture intérieure', 'peinture extérieure', 'ravalement de façade', 'pose papier peint', 'enduit de finition', 'rénovation complète'],
+// Services per trade
+const SERVICES_MAP: Record<string, string[][]> = {
+  vitrier: [
+    ['remplacement de vitre', 'double vitrage'],
+    ['bris de glace urgence', 'fenêtres PVC'],
+    ['vitrage simple', 'baies vitrées'],
+    ['fenêtres aluminium', 'miroirs sur mesure'],
+    ['velux', 'isolation thermique'],
+    ['double vitrage', 'remplacement fenêtre'],
+  ],
+  serrurier: [
+    ['ouverture de porte claquée', 'changement de serrure'],
+    ['serrure multipoints', 'blindage de porte'],
+    ['urgence 24h/7j', 'cylindre haute sécurité'],
+    ['serrure connectée', 'coffre-fort'],
+    ['protège-cylindre', 'porte blindée'],
+    ['ouverture de porte', 'remplacement serrure'],
+  ],
+  plombier: [
+    ['fuite eau urgence', 'débouchage canalisation'],
+    ['installation chauffe-eau', 'robinetterie'],
+    ['rénovation salle de bain', 'chauffage central'],
+    ['remplacement chaudière', 'détartrage'],
+  ],
+  electricien: [
+    ['dépannage électrique', 'tableau électrique'],
+    ['mise aux normes', 'installation prises'],
+    ['éclairage LED', 'borne recharge voiture'],
+  ],
+  peintre: [
+    ['peinture intérieure', 'peinture extérieure'],
+    ['ravalement de façade', 'pose papier peint'],
+    ['enduit de finition', 'rénovation complète'],
+  ],
 }
-
-// 30 completely different opening sentences — rotated to avoid repetition
-const OPENINGS = [
-  'Votre {service} de confiance à {city} intervient rapidement pour tous vos besoins.',
-  'Besoin d\'un {service} professionnel à {city} ? Nous sommes là pour vous.',
-  'À {city}, notre équipe de {service} est disponible 7j/7 pour vous aider.',
-  'Un problème urgent ? Votre {service} à {city} répond présent, même la nuit.',
-  'Depuis des années, nous sommes le {service} de référence à {city}.',
-  'Ne cherchez plus : le meilleur {service} à {city}, c\'est nous.',
-  'Intervention rapide et soignée — votre {service} à {city} est à votre service.',
-  'Qualité, rapidité, prix justes : votre {service} à {city} tient ses promesses.',
-  'Artisans locaux de {city}, nous sommes votre {service} de proximité.',
-  'Urgence ou travaux planifiés, votre {service} à {city} s\'adapte à vos besoins.',
-  'Faites confiance à des experts : {service} professionnel à {city}.',
-  'À {city} et alentours, notre équipe de {service} est prête à intervenir.',
-  'Vous méritez le meilleur : choisissez notre service de {service} à {city}.',
-  'Problème résolu rapidement grâce à votre {service} local à {city}.',
-  'Notre équipe de {service} à {city} met son expertise à votre service.',
-  'Devis gratuit, intervention rapide : c\'est la promesse de votre {service} à {city}.',
-  'À {city}, nous sommes l\'équipe de {service} qui intervient sans tarder.',
-  'Votre tranquillité d\'esprit commence ici : {service} professionnel à {city}.',
-  'Un {service} de confiance à {city} — disponible maintenant pour vous aider.',
-  'Nos techniciens {service} à {city} sont formés pour toutes les situations.',
-  'Choisissez la sécurité et la fiabilité : {service} certifié à {city}.',
-  'À votre écoute depuis toujours, votre {service} à {city} fait la différence.',
-  'Tarifs transparents, travail impeccable : votre {service} à {city} s\'engage.',
-  'Nous intervenons vite et bien : {service} d\'urgence à {city}.',
-  'La solution à vos problèmes : un {service} compétent à {city} disponible maintenant.',
-  'Votre {service} à {city} agit vite, travaille bien et respecte votre budget.',
-  'Faites appel aux meilleurs : {service} agréé à {city} à votre disposition.',
-  'Plus besoin de chercher : votre {service} de confiance à {city} est là.',
-  'Experts locaux à {city}, nous intervenons pour tous vos besoins en {service}.',
-  'Rapide, fiable et professionnel : c\'est votre {service} à {city}.',
-]
-
-function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
-function pickN<T>(arr: T[], n: number): T[] { return [...arr].sort(() => Math.random() - 0.5).slice(0, n) }
 
 function getTradeKey(keyword: string): string {
   const k = keyword.toLowerCase()
@@ -122,28 +114,23 @@ function buildHashtags(keyword: string, services: string[]): string[] {
   const tags: string[] = [tradeName]
   if (cityClean) tags.push(cityClean, `${tradeName}${cityClean}`)
   tags.push(`${tradeName}urgence`, `${tradeName}professionnel`)
-  tags.push(...services.slice(0, 3).map(s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')).filter(s => s.length > 3))
+  tags.push(...services.map(s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')).filter(s => s.length > 3).slice(0, 3))
   tags.push('devisgratuit', 'artisanlocal', 'interventionrapide')
-
   if (tradeKey === 'vitrier') tags.push('vitrage', 'brisdeglace', 'doublevitrage')
   else if (tradeKey === 'serrurier') tags.push('serrurerie', 'ouverturedeporte', 'urgenceserrurerie')
-  else if (tradeKey === 'plombier') tags.push('plomberie', 'fuitedeau', 'depannageplomberie')
+  else if (tradeKey === 'plombier') tags.push('plomberie', 'fuitedeau')
   else if (tradeKey === 'electricien') tags.push('electricite', 'depannageelectrique')
-  else if (tradeKey === 'peintre') tags.push('peinture', 'renovation', 'ravalement')
-
+  else if (tradeKey === 'peintre') tags.push('peinture', 'renovation')
   return [...new Set(tags)].filter(t => t.length > 2).slice(0, 10)
 }
 
-async function getLastContents(scheduleId: string, n = 5): Promise<string[]> {
-  try {
-    const posts = await prisma.autoPost.findMany({
-      where: { scheduleId },
-      orderBy: { sentAt: 'desc' },
-      take: n,
-      include: { article: { select: { content: true } } },
-    })
-    return posts.map(p => p.article?.content?.substring(0, 120) || '').filter(Boolean)
-  } catch { return [] }
+// Pick service pair based on day — cycles through all pairs
+function getServicesForToday(keyword: string): string[] {
+  const tradeKey = getTradeKey(keyword)
+  const pairs = SERVICES_MAP[tradeKey] || [['intervention rapide', 'devis gratuit']]
+  // Use day of year to cycle through pairs
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000)
+  return pairs[dayOfYear % pairs.length]
 }
 
 export async function generateArticle(
@@ -153,69 +140,40 @@ export async function generateArticle(
   company: CompanyInfo,
   scheduleId?: string
 ): Promise<string> {
-  const tradeKey = getTradeKey(keyword)
-  const allServices = SERVICES_MAP[tradeKey] || ['intervention rapide', 'devis gratuit', 'artisan qualifié']
-  const selectedServices = pickN(allServices, Math.floor(Math.random() * 2) + 2)
-
-  // Build hashtags in code — guaranteed every time
-  const hashtags = buildHashtags(keyword, selectedServices)
+  const services = getServicesForToday(keyword)
+  const hashtags = buildHashtags(keyword, services)
 
   const companyLines: string[] = []
   if (company.name)    companyLines.push(company.name)
   if (company.phone)   companyLines.push(`📞 ${company.phone}`)
   if (company.address) companyLines.push(`📍 ${company.address}`)
   if (company.website) companyLines.push(`🌐 ${company.website}`)
-  const companyClosing = companyLines.join(' | ')
   const hasCompany = companyLines.length > 0
+  const companyClosing = companyLines.join(' | ')
 
-  // Extract city and service name for opening
   const city = keyword.match(/\b(à|a|sur|en)\s+([A-ZÀ-Ü][a-zà-ü\-]+)/i)?.[2] || ''
-  const serviceName = keyword.split(' ')[0]
 
-  // Pick a random opening and customize it
-  const openingTemplate = pick(OPENINGS)
-  const opening = openingTemplate
-    .replace(/{service}/g, serviceName)
-    .replace(/{city}/g, city || 'votre région')
-
-  // Get last articles to avoid repetition
-  const lastContents = scheduleId ? await getLastContents(scheduleId) : []
-  const avoidNote = lastContents.length > 0
-    ? `\nÉVITE ABSOLUMENT ces formulations déjà utilisées:\n${lastContents.map((c, i) => `- "${c.substring(0, 60)}"`).join('\n')}`
-    : ''
-
-  // Unique timestamp seed
-  const seed = Date.now().toString(36) + Math.random().toString(36).substring(2, 6)
-
+  // Simple, clean prompt — no complexity that confuses the AI
   const raw = await aiChat([
     {
       role: 'system',
-      content: `Tu es un rédacteur publicitaire créatif [${seed}]. Tu écris UNIQUEMENT en ${language}. Tu dois écrire directement le corps du post en continuant la phrase d'ouverture donnée. JAMAIS d'intro comme "Voici", "Here is", etc. Chaque article doit être complètement unique.${!hasCompany ? " Ne mentionne AUCUNE info d'entreprise." : ''}`,
+      content: `Tu es un rédacteur publicitaire. Tu écris en ${language}. Tu produis directement le texte final sans commentaires ni explication.`,
     },
     {
       role: 'user',
-      content: `Continue ce post publicitaire en ${language} pour "${keyword}" en développant à partir de cette première phrase:
+      content: `Écris un post publicitaire en ${language} pour un ${keyword}.
+Services: ${services.join(' et ')}.
+${city ? `Ville: ${city}.` : ''}
+Ton: ${tone}.
+${hasCompany ? `Entreprise: ${companyClosing}` : ''}
 
-"${opening}"
-
-Services à développer (ces services SPÉCIFIQUEMENT, pas d'autres): ${selectedServices.join(', ')}
-Ton: ${tone}. Ajoute 2 paragraphes supplémentaires après l'ouverture. Total: 600-800 caractères.${hasCompany ? `\nFinis avec: ${companyClosing}` : ''}
-Appel à l'action fort à la fin.${avoidNote}
-
-Réponds UNIQUEMENT avec le texte du post (sans hashtags, sans intro).`,
+3 paragraphes courts. Appel à l'action à la fin. 600 à 800 caractères. Pas de hashtags dans le texte.`,
     },
-  ], 0.95)
+  ], 0.8)
 
-  // Clean up the response
-  let postText = stripPreamble(raw.trim())
-
-  // Make sure it starts with our opening if AI ignored it
-  if (!postText.startsWith(opening.substring(0, 20))) {
-    postText = `${opening}\n\n${postText}`
-  }
-
+  const postText = cleanAIOutput(raw.trim())
   const final = buildFinalPost(postText, hashtags)
-  console.log(`[Auto] opening="${opening.substring(0, 50)}" | ${postText.length} chars | ${hashtags.length} hashtags`)
+  console.log(`[Auto] services=[${services.join(',')}] | ${postText.length} chars | ${hashtags.length} hashtags`)
   return final
 }
 
