@@ -1,83 +1,121 @@
-# SocialPilot — AI Social Media Scheduler
+# Security + Bug Fix — Instructions
 
-Auto-generates and posts content to Facebook using AI (Gemini), on a fully automated schedule.
+## What this patch does
 
----
+### 1. Security
+Before: every `/api/*` route was publicly accessible. Anyone could `GET`,
+`PATCH`, `DELETE` any account, post, article, or schedule. `GET /api/accounts`
+even leaked all your Facebook / Google Business / Twitter access tokens in
+plain text. This is how someone wiped your data.
 
-## 🚀 Deploy to Vercel (Free — Recommended)
+After: a `middleware.ts` protects every `/api/*` route and every page
+(except `/login`). Access requires the `ADMIN_SECRET` env var, either as a
+cookie (set by the login page) or as an `x-admin-secret` header (for scripts).
+The accounts endpoints no longer return raw tokens to the client.
 
-### Step 1 — Neon Database (free PostgreSQL)
-1. Go to **neon.tech** → create free account → New Project
-2. Copy **both** connection strings:
-   - Pooled connection → `DATABASE_URL`
-   - Direct connection → `DIRECT_URL`
+### 2. "Porte claquée" bug on Google Business
+Before: `getServicesForDay()` picked ONE pair of services based on the day of
+the year, so every post on a given day used the same two services — and the
+AI naturally opened with the first one ("ouverture de porte claquée ..."). 
+The cron also runs hourly, so every hour of the day you got the same opening.
 
-### Step 2 — Push to GitHub
-```bash
-git init
-git add .
-git commit -m "initial"
-git remote add origin https://github.com/YOUR_USERNAME/social-scheduler.git
-git push -u origin main
-```
-
-### Step 3 — Deploy on Vercel
-1. Go to **vercel.com** → Add New Project → Import your GitHub repo
-2. Add these **Environment Variables** in Vercel Settings:
-
-| Variable | Value |
-|----------|-------|
-| `DATABASE_URL` | Neon pooled connection string |
-| `DIRECT_URL` | Neon direct connection string |
-| `GEMINI_API_KEY` | From aistudio.google.com |
-| `CRON_SECRET` | Any random string (e.g. abc123xyz) |
-
-3. Click **Deploy**
-
-### Step 4 — Initialize Database
-After deploy, run from your local machine (pointing to Neon):
-```bash
-npx prisma db push
-```
-
-### Step 5 — Done!
-Vercel's built-in cron (in vercel.json) calls `/api/cron` every minute automatically.
-No cron-job.org needed.
+After: `pickServices()` picks a random pair for every single post, and
+remembers the last pair used per schedule so it never repeats two in a row.
+The AI prompt was also rewritten to:
+- forbid starting the opening sentence with a service name
+- vary the opening style each time (question / situation / stat / anecdote / ...)
+- raise temperature from 0.8 to 0.95 for more variation
+- inject a random seed into the prompt
 
 ---
 
-## 💻 Local Development
+## STEP 0 — BEFORE you deploy: revoke your tokens NOW
 
-```bash
-# 1. Copy env file
-cp .env.example .env
-# Edit .env — use DATABASE_URL="file:./dev.db" for local SQLite
+Since the old API was public and leaked tokens, assume everything was stolen.
 
-# 2. Install
-npm install
-
-# 3. Setup database
-npx prisma db push
-
-# 4. Run (includes built-in cron every minute)
-npm run dev
-```
-
-Open http://localhost:3000
+1. **Facebook / Instagram**: Business Settings → System Users → revoke all tokens → regenerate. Also: Meta Business Suite → Settings → Page roles → check no unknown admin was added.
+2. **Google Business**: Google Cloud Console → APIs & Services → Credentials → delete the OAuth client → create new one. In Business Profile Manager → Users → remove any unknown user.
+3. **Twitter/X**: Developer Portal → your App → "Regenerate" on all keys and tokens.
+4. **WordPress**: wp-admin → Users → your user → Application Passwords → revoke all → create new.
+5. **Cloudinary**: Dashboard → Settings → Security → regenerate API Secret.
+6. **Groq / Gemini**: regenerate the API key.
+7. **Make.com webhook**: create a new scenario + webhook URL, disable the old one.
+8. **Vercel**: Project → Settings → Environment Variables → rotate `CRON_SECRET`,
+   `DATABASE_URL` password, and all of the above. Redeploy.
 
 ---
 
-## 📋 Usage
+## STEP 1 — Add ADMIN_SECRET to Vercel
 
-1. **Connect** → Add your Facebook Page token + Page ID
-2. **Photos** → Upload images for your posts
-3. **Auto-Calendar** → Create automation: pick keyword, days, times, company info
-4. **Test** → Visit `/api/test-automation` to fire immediately
+1. Generate a long random string (e.g. on https://www.random.org/strings or
+   run `openssl rand -hex 32`).
+2. Vercel → your Project → Settings → Environment Variables → Add:
+   - Name: `ADMIN_SECRET`
+   - Value: your random string
+   - Environments: Production, Preview, Development (check all 3)
+3. Save.
 
 ---
 
-## 🔑 Facebook Setup
-- Go to [Graph API Explorer](https://developers.facebook.com/tools/explorer)
-- Select your app → Generate token
-- Permissions needed: `pages_manage_posts`, `pages_read_engagement`, `pages_show_list`
-- Get your Page ID from your Facebook page URL or settings
+## STEP 2 — Replace / add these files in your project
+
+Copy each file from this `fixed/` folder to the matching path in your project.
+
+### NEW files (don't exist yet — create them)
+
+| Create this file in your project | Source here |
+|---|---|
+| `lib/auth.ts` | `lib/auth.ts` |
+| `middleware.ts` (at project root, same level as `package.json`) | `middleware.ts` |
+| `app/login/page.tsx` | `app/login/page.tsx` |
+| `app/api/login/route.ts` | `app/api/login/route.ts` |
+
+### REPLACE existing files
+
+| Replace this file | With |
+|---|---|
+| `lib/automation.ts` | `lib/automation.ts` (fixes porte claquée bug) |
+| `app/api/accounts/route.ts` | `app/api/accounts/route.ts` (stops token leak) |
+| `app/api/accounts/[id]/route.ts` | `app/api/accounts/[id]/route.ts` (stops token leak) |
+| `components/Sidebar.tsx` | `components/Sidebar.tsx` (adds logout button) |
+
+### Files you do NOT need to change
+
+All other `app/api/*/route.ts` files are now protected by `middleware.ts`,
+so you don't need to edit them one by one. They keep working as before,
+but the middleware blocks unauthenticated requests before they reach the route.
+
+The one exception is `app/api/cron/route.ts` — leave it as it is, it has its
+own `CRON_SECRET` check and is exempted in the middleware so Vercel cron jobs
+can still hit it.
+
+---
+
+## STEP 3 — Deploy and test
+
+1. `git add .`
+2. `git commit -m "Add auth + fix service rotation"`
+3. `git push` (Vercel auto-deploys)
+4. Visit `https://your-app.vercel.app` → you should be redirected to `/login`
+5. Enter the `ADMIN_SECRET` you set in step 1 → you're in.
+6. Try visiting `https://your-app.vercel.app/api/accounts` in a private window
+   (no cookie) → you should get `{"error":"Unauthorized"}`. That confirms it works.
+7. Trigger a test post from the Auto-Calendar page and check that Google
+   Business no longer opens with "ouverture de porte claquée".
+
+---
+
+## STEP 4 (later, recommended) — Harder fixes
+
+These are longer-term improvements, not required today:
+
+1. **Encrypt access tokens at rest**. Right now they're plain text in the DB.
+   If someone gets DB access, they still see them. Use a package like
+   `@47ng/cloak` or Node's built-in `crypto` module with a `TOKEN_ENCRYPTION_KEY`.
+2. **Replace shared-secret auth with real login**. Use NextAuth.js / Clerk /
+   Auth.js for proper user accounts, 2FA, etc.
+3. **Add rate limiting** on login attempts so someone can't brute-force the secret.
+4. **Enable Vercel Deployment Protection** (Project → Settings → Deployment
+   Protection) so even previews require Vercel auth.
+5. **Audit Vercel access logs** (Dashboard → Logs) for the dates when data
+   went missing, look for suspicious `DELETE` calls and unknown IPs.
