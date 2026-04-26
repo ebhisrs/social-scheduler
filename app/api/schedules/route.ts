@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
-  const schedules = await prisma.schedule.findMany({ orderBy: { createdAt: 'desc' } })
-  return NextResponse.json(schedules)
+  return NextResponse.json(await prisma.schedule.findMany({ orderBy: { createdAt: 'desc' } }))
 }
