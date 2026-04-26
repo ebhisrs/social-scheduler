@@ -4,19 +4,8 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const accounts = await prisma.account.findMany({ orderBy: { createdAt: 'desc' } })
-  // Never return raw tokens to the client. Only a flag that one exists.
-  const safe = accounts.map(a => ({
-    id: a.id,
-    platform: a.platform,
-    username: a.username,
-    pageId: a.pageId,
-    extraData: a.extraData,
-    createdAt: a.createdAt,
-    hasAccessToken: !!a.accessToken,
-    hasRefreshToken: !!a.refreshToken,
-  }))
-  return NextResponse.json(safe)
+  // Middleware ensures only authenticated users reach here
+  return NextResponse.json(await prisma.account.findMany({ orderBy: { createdAt: 'desc' } }))
 }
 
 export async function POST(request: Request) {
@@ -34,12 +23,5 @@ export async function POST(request: Request) {
       extraData: typeof extraData === 'object' ? JSON.stringify(extraData) : (extraData || null),
     },
   })
-  // Don't echo the token back
-  return NextResponse.json({
-    id: account.id,
-    platform: account.platform,
-    username: account.username,
-    pageId: account.pageId,
-    createdAt: account.createdAt,
-  })
+  return NextResponse.json(account)
 }

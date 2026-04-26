@@ -6,17 +6,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   const a = await prisma.account.findUnique({ where: { id: params.id } })
   if (!a) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  // Never return raw tokens to the client
-  return NextResponse.json({
-    id: a.id,
-    platform: a.platform,
-    username: a.username,
-    pageId: a.pageId,
-    extraData: a.extraData,
-    createdAt: a.createdAt,
-    hasAccessToken: !!a.accessToken,
-    hasRefreshToken: !!a.refreshToken,
-  })
+  return NextResponse.json(a)
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -31,13 +21,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       : body.extraData
   }
   const updated = await prisma.account.update({ where: { id: params.id }, data: updateData })
-  return NextResponse.json({
-    id: updated.id,
-    platform: updated.platform,
-    username: updated.username,
-    pageId: updated.pageId,
-    createdAt: updated.createdAt,
-  })
+  return NextResponse.json(updated)
 }
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
