@@ -5,3 +5,5 @@ dev.db
 dev.db-journal
 public/uploads/*
 !public/uploads/.gitkeep
+.vercel
+.env*.local
